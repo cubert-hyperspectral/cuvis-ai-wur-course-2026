@@ -1,0 +1,155 @@
+metadata:
+  name: pork_pls_fusion
+  description: 'Pork belly fat from the 512 ResNet-18 spatial and 300 spectral features:
+    three PLS models (spatial, spectral, stacked) with five-fold component selection,
+    and the average of the spatial and spectral predictions.'
+  created: ''
+  tags:
+  - course
+  - pls
+  - fusion
+  author: Cubert GmbH
+  cuvis_ai_version: 0.14.3
+plugins:
+- cuvis_ai_builtin
+- cuvis_ai_wur_course
+nodes:
+- name: frame
+  class_name: cuvis_ai_wur_course.node.source.CourseFrame
+  hparams:
+    name: null
+- name: center
+  class_name: cuvis_ai.node.pretreatments.scaling.MeanCenter
+  hparams:
+    max_fit_pixels: 20000
+    fit_seed: 0
+- name: scale
+  class_name: cuvis_ai.node.pretreatments.scaling.UnitVarianceScaling
+  hparams:
+    max_fit_pixels: 20000
+    fit_seed: 0
+- name: spatial_block
+  class_name: cuvis_ai_wur_course.node.fusion.ChannelSlice
+  hparams:
+    start: 0
+    stop: 512
+- name: spectral_block
+  class_name: cuvis_ai_wur_course.node.fusion.ChannelSlice
+  hparams:
+    start: 512
+    stop: 812
+- name: pls_spatial
+  class_name: cuvis_ai_wur_course.node.regression.PLSRegression
+  hparams:
+    input_channels: 512
+    n_targets: 1
+    n_components: null
+    max_components: 20
+    holdout_folds: each
+    refit_on_holdout: true
+    eps: 1.0e-12
+- name: pls_spectral
+  class_name: cuvis_ai_wur_course.node.regression.PLSRegression
+  hparams:
+    input_channels: 300
+    n_targets: 1
+    n_components: null
+    max_components: 20
+    holdout_folds: each
+    refit_on_holdout: true
+    eps: 1.0e-12
+- name: pls_stacked
+  class_name: cuvis_ai_wur_course.node.regression.PLSRegression
+  hparams:
+    input_channels: 812
+    n_targets: 1
+    n_components: null
+    max_components: 20
+    holdout_folds: each
+    refit_on_holdout: true
+    eps: 1.0e-12
+- name: mean_spatial
+  class_name: cuvis_ai_wur_course.node.fusion.SpatialMean
+  hparams:
+    name: null
+- name: metrics_spatial
+  class_name: cuvis_ai_wur_course.node.metrics.RegressionMetrics
+  hparams: {}
+- name: mean_spectral
+  class_name: cuvis_ai_wur_course.node.fusion.SpatialMean
+  hparams:
+    name: null
+- name: metrics_spectral
+  class_name: cuvis_ai_wur_course.node.metrics.RegressionMetrics
+  hparams: {}
+- name: mean_stacked
+  class_name: cuvis_ai_wur_course.node.fusion.SpatialMean
+  hparams:
+    name: null
+- name: metrics_stacked
+  class_name: cuvis_ai_wur_course.node.metrics.RegressionMetrics
+  hparams: {}
+- name: fusion
+  class_name: cuvis_ai_wur_course.node.fusion.PredictionMean
+  hparams:
+    name: null
+- name: metrics_fusion
+  class_name: cuvis_ai_wur_course.node.metrics.RegressionMetrics
+  hparams: {}
+connections:
+- source: frame.outputs.cube
+  target: center.inputs.cube
+- source: frame.outputs.wavelengths
+  target: spatial_block.inputs.wavelengths
+- source: frame.outputs.wavelengths
+  target: spectral_block.inputs.wavelengths
+- source: frame.outputs.target
+  target: pls_spatial.inputs.target
+- source: frame.outputs.fold
+  target: pls_spatial.inputs.fold
+- source: frame.outputs.target
+  target: pls_spectral.inputs.target
+- source: frame.outputs.fold
+  target: pls_spectral.inputs.fold
+- source: frame.outputs.target
+  target: pls_stacked.inputs.target
+- source: frame.outputs.fold
+  target: pls_stacked.inputs.fold
+- source: frame.outputs.target
+  target: metrics_spatial.inputs.target
+- source: frame.outputs.target
+  target: metrics_spectral.inputs.target
+- source: frame.outputs.target
+  target: metrics_stacked.inputs.target
+- source: frame.outputs.target
+  target: metrics_fusion.inputs.target
+- source: center.outputs.cube
+  target: scale.inputs.cube
+- source: scale.outputs.cube
+  target: spatial_block.inputs.cube
+- source: scale.outputs.cube
+  target: spectral_block.inputs.cube
+- source: scale.outputs.cube
+  target: pls_stacked.inputs.cube
+- source: spatial_block.outputs.cube
+  target: pls_spatial.inputs.cube
+- source: spectral_block.outputs.cube
+  target: pls_spectral.inputs.cube
+- source: pls_spatial.outputs.prediction
+  target: mean_spatial.inputs.prediction
+- source: pls_spectral.outputs.prediction
+  target: mean_spectral.inputs.prediction
+- source: pls_stacked.outputs.prediction
+  target: mean_stacked.inputs.prediction
+- source: mean_spatial.outputs.prediction
+  target: metrics_spatial.inputs.prediction
+- source: mean_spatial.outputs.prediction
+  target: fusion.inputs.prediction
+- source: mean_spectral.outputs.prediction
+  target: metrics_spectral.inputs.prediction
+- source: mean_spectral.outputs.prediction
+  target: fusion.inputs.prediction
+- source: mean_stacked.outputs.prediction
+  target: metrics_stacked.inputs.prediction
+- source: fusion.outputs.prediction
+  target: metrics_fusion.inputs.prediction

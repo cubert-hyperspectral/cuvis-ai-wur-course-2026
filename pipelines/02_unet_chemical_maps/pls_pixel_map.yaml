@@ -1,0 +1,84 @@
+metadata:
+  name: pls_pixel_map
+  description: A dequantised slice, centre-cropped, to absorbance, SNV and Savitzky-Golay
+    per pixel, through the PLS model fitted on the mean spectra (same node name, weights
+    restored by name), with map statistics against the slice mask the course already
+    ships at the U-Net output grid, upsampled by two as the course's np.kron does.
+  created: ''
+  tags:
+  - course
+  - pls
+  - chemical-map
+  author: Cubert GmbH
+  cuvis_ai_version: 0.14.3
+plugins:
+- cuvis_ai_builtin
+- cuvis_ai_wur_course
+nodes:
+- name: frame
+  class_name: cuvis_ai_wur_course.node.source.CourseFrame
+  hparams:
+    name: null
+- name: dequantize
+  class_name: cuvis_ai_wur_course.node.maps.Dequantize
+  hparams:
+    name: null
+- name: crop
+  class_name: cuvis_ai_wur_course.node.maps.CenterCrop
+  hparams:
+    crop_height: 1992
+    crop_width: 904
+- name: absorbance
+  class_name: cuvis_ai.node.pretreatments.logarithm.Logarithm
+  hparams:
+    mode: log10
+    negate: true
+    eps: 1.0e-06
+- name: snv
+  class_name: cuvis_ai.node.pretreatments.snv.SNVCorrection
+  hparams:
+    eps: 1.0e-08
+- name: sg
+  class_name: cuvis_ai_wur_course.node.pretreatment.SavitzkyGolayInterp
+  hparams:
+    num_channels: 62
+    window_length: 7
+    polyorder: 2
+    deriv: 2
+    delta: 1.0
+- name: pls
+  class_name: cuvis_ai_wur_course.node.regression.PLSRegression
+  hparams:
+    input_channels: 62
+    n_targets: 1
+    n_components: null
+    max_components: 20
+    holdout_folds: each
+    refit_on_holdout: true
+    eps: 1.0e-12
+- name: stats
+  class_name: cuvis_ai_wur_course.node.maps.ChemicalMapStatistics
+  hparams:
+    mask_scale: 2
+    eps: 1.0e-12
+connections:
+- source: frame.outputs.cube
+  target: dequantize.inputs.cube
+- source: frame.outputs.quant_scale
+  target: dequantize.inputs.quant_scale
+- source: frame.outputs.quant_bias
+  target: dequantize.inputs.quant_bias
+- source: frame.outputs.mask
+  target: stats.inputs.mask
+- source: dequantize.outputs.cube
+  target: crop.inputs.cube
+- source: crop.outputs.cube
+  target: absorbance.inputs.cube
+- source: absorbance.outputs.cube
+  target: snv.inputs.cube
+- source: snv.outputs.cube
+  target: sg.inputs.cube
+- source: sg.outputs.cube
+  target: pls.inputs.cube
+- source: pls.outputs.prediction
+  target: stats.inputs.map

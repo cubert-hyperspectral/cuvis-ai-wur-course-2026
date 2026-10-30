@@ -179,3 +179,20 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+# cuvis-ai rebuild: local data, runs and machine-specific files
+*.mat
+*.npz
+*.pth
+.context/
+.cuvis-ai-env.json
+.gitnexus/
+.gstack/
+.ipynb_checkpoints/
+.superpowers/
+.venv/
+/.claude/
+/AGENTS.md
+/data/
+/lightning_logs/
+/outputs/

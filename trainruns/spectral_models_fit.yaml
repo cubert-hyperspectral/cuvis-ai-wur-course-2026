@@ -1,0 +1,29 @@
+# Statistical phase of notebook 03: the global scalar standardisation, the three-component PCA
+# and the PLS model selected on hold-out split 1 (fold 1 inside the statistical train split, which
+# holds course splits 1 to 5; split 0 is the test split). The MLP and 1D ResNet nodes load the
+# course's trained weights and only report metrics here.
+#
+# Run from the repository root:
+#   uv run restore-trainrun --trainrun-path trainruns/spectral_models_fit.yaml --plugins-dir plugins --mode train
+#
+# `pipeline` and `splits_path` are resolved relative to this file; `universe_csv` relative to the
+# working directory (the repository root). The data folder comes from
+# `prepare-course-data mean-spectra-03 --out-dir data/course/mean_spectra_03`.
+name: spectral_models_fit
+pipeline: ../pipelines/03_spectral_vs_spatial/spectral_models.yaml
+output_dir: outputs/spectral_models_fit
+data:
+  data_module: wur_course_npz
+  splits:
+    splits_path: ../data/course/mean_spectra_03/splits.json
+  batch_size: 32
+  params:
+    universe_csv: data/course/mean_spectra_03/universe.csv
+metric_nodes:
+  - metrics_pls
+  - metrics_mlp
+  - metrics_resnet1d
+  - explained_variance
+loss_nodes: []
+unfreeze_nodes: []
+freeze_nodes: []

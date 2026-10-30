@@ -1,0 +1,28 @@
+# Statistical fit of the mean-spectra PLS model of notebook 02 (binning, SNV, Savitzky-Golay,
+# PLS with the component count chosen by leave-one-split-out pooled SSE over CV splits 1 to 5).
+#
+# Run from the repository root:
+#   uv run restore-trainrun --trainrun-path trainruns/pls_mean_spectra_fit.yaml --plugins-dir plugins --mode train
+#
+# `pipeline` and `splits_path` are resolved relative to this file; `universe_csv` relative to the
+# working directory (the repository root). The fit reads the 124-band frames of
+# `prepare-course-data mean-spectra-03 --out-dir data/course/mean_spectra_03` and bins them to 62
+# bands in the pipeline, as the notebook does while loading; the train split (course splits 1 to 5)
+# and the fold ids are the same as in the notebook 02 section.
+# The fitted PLS node is named `pls` here and in pipelines/02_unet_chemical_maps/pls_pixel_map.yaml,
+# so the pixel-map pipeline restores its weights by name from this run's output.
+name: pls_mean_spectra_fit
+pipeline: ../pipelines/02_unet_chemical_maps/pls_mean_spectra_fit.yaml
+output_dir: outputs/pls_mean_spectra_fit
+data:
+  data_module: wur_course_npz
+  splits:
+    splits_path: ../data/course/mean_spectra_03/splits.json
+  batch_size: 32
+  params:
+    universe_csv: data/course/mean_spectra_03/universe.csv
+metric_nodes:
+  - metrics_pls
+loss_nodes: []
+unfreeze_nodes: []
+freeze_nodes: []

@@ -1,0 +1,75 @@
+metadata:
+  name: pls_mean_spectra_fit
+  description: Mean spectra binned to 62 bands, SNV, Savitzky-Golay second derivative
+    (window 7, order 2, scipy interp edges), PLS with the component count chosen by
+    leave-one-split-out pooled SSE over the five CV splits.
+  created: ''
+  tags:
+  - course
+  - pls
+  - fit
+  author: Cubert GmbH
+  cuvis_ai_version: 0.14.3
+plugins:
+- cuvis_ai_builtin
+- cuvis_ai_wur_course
+nodes:
+- name: frame
+  class_name: cuvis_ai_wur_course.node.source.CourseFrame
+  hparams:
+    name: null
+- name: binning
+  class_name: cuvis_ai_wur_course.node.pretreatment.SpectralBinning
+  hparams:
+    input_channels: 124
+    bin_size: 2
+- name: snv
+  class_name: cuvis_ai.node.pretreatments.snv.SNVCorrection
+  hparams:
+    eps: 1.0e-08
+- name: sg
+  class_name: cuvis_ai_wur_course.node.pretreatment.SavitzkyGolayInterp
+  hparams:
+    num_channels: 62
+    window_length: 7
+    polyorder: 2
+    deriv: 2
+    delta: 1.0
+- name: pls
+  class_name: cuvis_ai_wur_course.node.regression.PLSRegression
+  hparams:
+    input_channels: 62
+    n_targets: 1
+    n_components: null
+    max_components: 20
+    holdout_folds: each
+    refit_on_holdout: true
+    eps: 1.0e-12
+- name: mean_pls
+  class_name: cuvis_ai_wur_course.node.fusion.SpatialMean
+  hparams:
+    name: null
+- name: metrics_pls
+  class_name: cuvis_ai_wur_course.node.metrics.RegressionMetrics
+  hparams: {}
+connections:
+- source: frame.outputs.cube
+  target: binning.inputs.cube
+- source: frame.outputs.wavelengths
+  target: binning.inputs.wavelengths
+- source: frame.outputs.target
+  target: pls.inputs.target
+- source: frame.outputs.fold
+  target: pls.inputs.fold
+- source: frame.outputs.target
+  target: metrics_pls.inputs.target
+- source: binning.outputs.cube
+  target: snv.inputs.cube
+- source: snv.outputs.cube
+  target: sg.inputs.cube
+- source: sg.outputs.cube
+  target: pls.inputs.cube
+- source: pls.outputs.prediction
+  target: mean_pls.inputs.prediction
+- source: mean_pls.outputs.prediction
+  target: metrics_pls.inputs.prediction
