@@ -1,0 +1,597 @@
+# WUR course plugin manifest: the nodes and the data module of cuvis_ai_wur_course.
+#
+# Pipelines declare `plugins: [cuvis_ai_wur_course]` and the loader finds this file through
+# `--plugins-dir plugins` from the repository root; `path` is relative to this file.
+name: cuvis_ai_wur_course
+path: ".."
+package_name: cuvis-ai-wur-course
+capabilities:
+- class_name: cuvis_ai_wur_course.data.course_npz.CourseNpzDataModule
+  kind: data_module
+  data_module_name: wur_course_npz
+  extras: []
+- class_name: cuvis_ai_wur_course.node.source.CourseFrame
+  category: source
+  tags: [hyperspectral, metadata, tabular]
+  icon_svg: "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"#E8A33D\" stroke-width=\"2.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\">\n  <ellipse cx=\"22\" cy=\"18\" rx=\"12\" ry=\"4\"/>\n  <path d=\"M10 18v26c0 2.2 5.4 4 12 4s12-1.8 12-4V18\"/>\n  <path d=\"M10 28c0 2.2 5.4 4 12 4s12-1.8 12-4\"/>\n  <path d=\"M10 38c0 2.2 5.4 4 12 4s12-1.8 12-4\"/>\n  <path d=\"M40 32h14\"/>\n  <path d=\"M48 26l6 6-6 6\"/>\n</svg>\n"
+  input_specs:
+    cube:
+      dtype: ''
+      shape: [-1, -1, -1, -1]
+      optional: false
+      description: Input cube [B, H, W, C].
+    wavelengths:
+      dtype: ''
+      shape: [-1, -1]
+      optional: false
+      description: Wavelength axis in nm, batched [B, C] as the data module delivers it.
+    mask:
+      dtype: int32
+      shape: [-1, -1, -1]
+      optional: true
+      description: Segmentation mask [B, H, W].
+    target:
+      dtype: ''
+      shape: [-1, -1]
+      optional: true
+      description: Regression target(s) per frame [B, T].
+    fold:
+      dtype: ''
+      shape: [-1]
+      optional: true
+      description: Cross-validation fold id per frame [B].
+    group:
+      dtype: ''
+      shape: [-1]
+      optional: true
+      description: Leakage-grouping id per frame (e.g. a belly id) [B].
+    quant_scale:
+      dtype: ''
+      shape: [-1]
+      optional: true
+      description: Dequantization scale per frame [B].
+    quant_bias:
+      dtype: ''
+      shape: [-1]
+      optional: true
+      description: Dequantization bias per frame [B].
+  output_specs:
+    cube:
+      dtype: float32
+      shape: [-1, -1, -1, -1]
+      optional: false
+      description: Cube [B, H, W, C] as float32.
+    wavelengths:
+      dtype: int32
+      shape: [-1]
+      optional: false
+      description: Wavelengths [C] in nm as np.int32, as the builtin source emits them; Wavelength axis in nm [C] (first batch element).
+    mask:
+      dtype: int32
+      shape: [-1, -1, -1]
+      optional: true
+      description: Segmentation mask passthrough [B, H, W].
+    target:
+      dtype: float32
+      shape: [-1, -1]
+      optional: true
+      description: Regression target(s) per frame [B, T].
+    fold:
+      dtype: int32
+      shape: [-1]
+      optional: true
+      description: Cross-validation fold id per frame [B].
+    group:
+      dtype: int32
+      shape: [-1]
+      optional: true
+      description: Leakage-grouping id per frame [B].
+    quant_scale:
+      dtype: float32
+      shape: [-1]
+      optional: true
+      description: Dequantization scale per frame [B].
+    quant_bias:
+      dtype: float32
+      shape: [-1]
+      optional: true
+      description: Dequantization bias per frame [B].
+  doc_summary: Normalizes a ``CourseNpzDataModule`` batch into pipeline ports.
+- class_name: cuvis_ai_wur_course.node.regression.PLSRegression
+  category: model
+  tags: [hyperspectral, regression, stateful, torch]
+  icon_svg: "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"#4E7BD4\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\">\n  <circle cx=\"14\" cy=\"20\" r=\"3\"/>\n  <circle cx=\"14\" cy=\"32\" r=\"3\"/>\n  <circle cx=\"14\" cy=\"44\" r=\"3\"/>\n  <circle cx=\"32\" cy=\"16\" r=\"3\"/>\n  <circle cx=\"32\" cy=\"32\" r=\"3\"/>\n  <circle cx=\"32\" cy=\"48\" r=\"3\"/>\n  <circle cx=\"50\" cy=\"26\" r=\"3\"/>\n  <circle cx=\"50\" cy=\"38\" r=\"3\"/>\n  <path d=\"M17 20l12-4M17 32l12-16M17 44l12-28\"/>\n  <path d=\"M17 20l12 12M17 32l12 0M17 44l12-12\"/>\n  <path d=\"M17 20l12 28M17 32l12 16M17 44l12 4\"/>\n  <path d=\"M35 16l12 10M35 32l12-6M35 48l12-22\"/>\n  <path d=\"M35 16l12 22M35 32l12 6M35 48l12-10\"/>\n</svg>\n"
+  input_specs:
+    cube:
+      dtype: float32
+      shape: [-1, -1, -1, -1]
+      optional: false
+      description: Hyperspectral cube, BHWC float32.
+    target:
+      dtype: float32
+      shape: [-1, -1]
+      optional: true
+      description: Per-frame regression target(s), needed for fitting.
+    fold:
+      dtype: int32
+      shape: [-1]
+      optional: true
+      description: Per-frame fold id; required when holdout_folds drives selection.
+  output_specs:
+    prediction:
+      dtype: float32
+      shape: [-1, -1, -1, -1]
+      optional: false
+      description: Per-pixel prediction, (cube - x_mean) @ coef + y_mean.
+  doc_summary: Predict continuous targets from a hyperspectral cube with fitted PLS.
+- class_name: cuvis_ai_wur_course.node.metrics.RegressionMetrics
+  category: metric
+  tags: [evaluation, regression]
+  icon_svg: "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"#C9615A\" stroke-width=\"2.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\">\n  <path d=\"M10 14v40h44\"/>\n  <rect x=\"16\" y=\"38\" width=\"8\" height=\"12\"/>\n  <rect x=\"28\" y=\"28\" width=\"8\" height=\"22\"/>\n  <rect x=\"40\" y=\"18\" width=\"8\" height=\"32\"/>\n</svg>\n"
+  input_specs:
+    prediction:
+      dtype: float32
+      shape: [-1, -1]
+      optional: false
+      description: Predicted regression values [B, T].
+    target:
+      dtype: float32
+      shape: [-1, -1]
+      optional: false
+      description: Ground-truth regression values [B, T].
+  output_specs:
+    rmse:
+      dtype: float32
+      shape: []
+      optional: false
+      description: Pooled root-mean-squared error so far.
+    r2:
+      dtype: float32
+      shape: []
+      optional: false
+      description: Pooled R2 score so far.
+    mae:
+      dtype: float32
+      shape: []
+      optional: false
+      description: Pooled mean absolute error so far.
+  doc_summary: Pooled RMSE, R2 and MAE for a scalar or multi-target regression head.
+- class_name: cuvis_ai_wur_course.node.losses.RegressionMSELoss
+  category: loss
+  tags: [differentiable, torch, training]
+  icon_svg: "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"#9A5DD4\" stroke-width=\"2.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\">\n  <path d=\"M10 14v40h44\"/>\n  <path d=\"M14 18c8 0 12 8 18 18s12 14 22 14\"/>\n  <path d=\"M48 44l6 6-6 6\" transform=\"translate(0 -6)\"/>\n</svg>\n"
+  input_specs:
+    prediction:
+      dtype: float32
+      shape: [-1, -1]
+      optional: false
+      description: Predicted regression values [B, T].
+    target:
+      dtype: float32
+      shape: [-1, -1]
+      optional: false
+      description: Ground-truth regression values [B, T].
+  output_specs:
+    loss:
+      dtype: float32
+      shape: []
+      optional: false
+      description: Scalar MSE loss value.
+  doc_summary: Mean squared error between a regression prediction and its target.
+- class_name: cuvis_ai_wur_course.node.scaling.GlobalScalarStandardizer
+  category: transform
+  tags: [hyperspectral, normalization, preprocessing, torch]
+  icon_svg: "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"#6FAE5C\" stroke-width=\"2.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\">\n  <path d=\"M52 26a20 20 0 0 0-36 0\"/>\n  <path d=\"M52 16v10h-10\"/>\n  <path d=\"M12 38a20 20 0 0 0 36 0\"/>\n  <path d=\"M12 48v-10h10\"/>\n</svg>\n"
+  input_specs:
+    cube:
+      dtype: float32
+      shape: [-1, -1, -1, -1]
+      optional: false
+      description: Hyperspectral cube, BHWC float32.
+    fold:
+      dtype: int32
+      shape: [-1]
+      optional: true
+      description: Per-frame fold id; required when exclude_folds is set.
+  output_specs:
+    cube:
+      dtype: float32
+      shape: [-1, -1, -1, -1]
+      optional: false
+      description: Standardized cube, same shape as the input.
+  doc_summary: Subtract one scalar mean and divide by one scalar standard deviation.
+- class_name: cuvis_ai_wur_course.node.pca.DatasetPCA
+  category: transform
+  tags: [dim_reduction, hyperspectral, preprocessing, torch]
+  icon_svg: "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"#6FAE5C\" stroke-width=\"2.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\">\n  <path d=\"M52 26a20 20 0 0 0-36 0\"/>\n  <path d=\"M52 16v10h-10\"/>\n  <path d=\"M12 38a20 20 0 0 0 36 0\"/>\n  <path d=\"M12 48v-10h10\"/>\n</svg>\n"
+  input_specs:
+    cube:
+      dtype: float32
+      shape: [-1, -1, -1, -1]
+      optional: false
+      description: Hyperspectral cube, BHWC float32.
+    fold:
+      dtype: int32
+      shape: [-1]
+      optional: true
+      description: Per-frame fold id; required when exclude_folds is set.
+  output_specs:
+    cube:
+      dtype: float32
+      shape: [-1, -1, -1, -1]
+      optional: false
+      description: Cube projected onto the fitted principal components.
+    explained_variance_ratio:
+      dtype: float32
+      shape: [-1]
+      optional: false
+      description: Fraction of total variance explained by each retained component.
+  doc_summary: Project a cube onto principal components fitted once over a whole dataset pass.
+- class_name: cuvis_ai_wur_course.node.pretreatment.SpectralBinning
+  category: transform
+  tags: [hyperspectral, preprocessing, torch]
+  icon_svg: "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"#6FAE5C\" stroke-width=\"2.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\">\n  <path d=\"M52 26a20 20 0 0 0-36 0\"/>\n  <path d=\"M52 16v10h-10\"/>\n  <path d=\"M12 38a20 20 0 0 0 36 0\"/>\n  <path d=\"M12 48v-10h10\"/>\n</svg>\n"
+  input_specs:
+    cube:
+      dtype: float32
+      shape: [-1, -1, -1, -1]
+      optional: false
+      description: Hyperspectral cube [B, H, W, C].
+    wavelengths:
+      dtype: int32
+      shape: [-1]
+      optional: true
+      description: Optional per-channel wavelengths [C] in nanometers, binned the same way as the cube.
+  output_specs:
+    cube:
+      dtype: float32
+      shape: [-1, -1, -1, -1]
+      optional: false
+      description: Binned cube [B, H, W, C // bin_size].
+    wavelengths:
+      dtype: int32
+      shape: [-1]
+      optional: true
+      description: Binned wavelengths [C // bin_size]; only present when the wavelengths input is connected.
+  doc_summary: Average adjacent channels of a hyperspectral cube into coarser bands.
+- class_name: cuvis_ai_wur_course.node.pretreatment.SavitzkyGolayInterp
+  category: transform
+  tags: [differentiable, hyperspectral, preprocessing, torch]
+  icon_svg: "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"#6FAE5C\" stroke-width=\"2.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\">\n  <path d=\"M52 26a20 20 0 0 0-36 0\"/>\n  <path d=\"M52 16v10h-10\"/>\n  <path d=\"M12 38a20 20 0 0 0 36 0\"/>\n  <path d=\"M12 48v-10h10\"/>\n</svg>\n"
+  input_specs:
+    cube:
+      dtype: float32
+      shape: [-1, -1, -1, -1]
+      optional: false
+      description: Hyperspectral cube [B, H, W, C], C == num_channels.
+  output_specs:
+    cube:
+      dtype: float32
+      shape: [-1, -1, -1, -1]
+      optional: false
+      description: Filtered cube [B, H, W, C], same shape as the input.
+  doc_summary: Savitzky-Golay filter with SciPy's ``mode="interp"`` edge handling.
+- class_name: cuvis_ai_wur_course.node.fusion.ChannelSlice
+  category: transform
+  tags: [hyperspectral, preprocessing, torch]
+  icon_svg: "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"#6FAE5C\" stroke-width=\"2.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\">\n  <path d=\"M52 26a20 20 0 0 0-36 0\"/>\n  <path d=\"M52 16v10h-10\"/>\n  <path d=\"M12 38a20 20 0 0 0 36 0\"/>\n  <path d=\"M12 48v-10h10\"/>\n</svg>\n"
+  input_specs:
+    cube:
+      dtype: float32
+      shape: [-1, -1, -1, -1]
+      optional: false
+      description: Hyperspectral cube [B, H, W, C].
+    wavelengths:
+      dtype: int32
+      shape: [-1]
+      optional: true
+      description: Optional per-channel wavelengths [C], sliced the same way as the cube.
+  output_specs:
+    cube:
+      dtype: float32
+      shape: [-1, -1, -1, -1]
+      optional: false
+      description: Sliced cube [B, H, W, stop - start].
+    wavelengths:
+      dtype: int32
+      shape: [-1]
+      optional: true
+      description: Sliced wavelengths [stop - start]; only present when the wavelengths input is connected.
+  doc_summary: Slice a contiguous range of channels out of a hyperspectral cube.
+- class_name: cuvis_ai_wur_course.node.fusion.PredictionMean
+  category: transform
+  tags: [differentiable, regression, torch]
+  icon_svg: "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"#6FAE5C\" stroke-width=\"2.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\">\n  <path d=\"M52 26a20 20 0 0 0-36 0\"/>\n  <path d=\"M52 16v10h-10\"/>\n  <path d=\"M12 38a20 20 0 0 0 36 0\"/>\n  <path d=\"M12 48v-10h10\"/>\n</svg>\n"
+  input_specs:
+    prediction:
+      dtype: float32
+      shape: [-1, -1]
+      optional: false
+      description: Per-target predictions [B, T] of one shape, one per inbound connection (fan-in).
+      variadic: true
+  output_specs:
+    prediction:
+      dtype: float32
+      shape: [-1, -1]
+      optional: false
+      description: Mean prediction [B, T] across the inbound connections.
+  doc_summary: Average several ``[B, T]`` predictions into one, fan-in on one variadic port.
+- class_name: cuvis_ai_wur_course.node.fusion.SpatialMean
+  category: transform
+  tags: [differentiable, regression, torch]
+  icon_svg: "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"#6FAE5C\" stroke-width=\"2.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\">\n  <path d=\"M52 26a20 20 0 0 0-36 0\"/>\n  <path d=\"M52 16v10h-10\"/>\n  <path d=\"M12 38a20 20 0 0 0 36 0\"/>\n  <path d=\"M12 48v-10h10\"/>\n</svg>\n"
+  input_specs:
+    prediction:
+      dtype: float32
+      shape: [-1, -1, -1, -1]
+      optional: false
+      description: Per-pixel regression map [B, H, W, T].
+  output_specs:
+    prediction:
+      dtype: float32
+      shape: [-1, -1]
+      optional: false
+      description: Mean prediction [B, T] over H and W.
+  doc_summary: Collapse a per-pixel regression map into one value per frame and target.
+- class_name: cuvis_ai_wur_course.node.kiwi.LabelBBoxFilter
+  category: transform
+  tags: [bbox, mask, segmentation, torch]
+  icon_svg: "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"#6FAE5C\" stroke-width=\"2.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\">\n  <path d=\"M52 26a20 20 0 0 0-36 0\"/>\n  <path d=\"M52 16v10h-10\"/>\n  <path d=\"M12 38a20 20 0 0 0 36 0\"/>\n  <path d=\"M12 48v-10h10\"/>\n</svg>\n"
+  input_specs:
+    mask:
+      dtype: int32
+      shape: [-1, -1, -1]
+      optional: false
+      description: Labelled mask [B, H, W] int32; 0 is background, each other value one object id (e.g. SAM3SegmentEverything output).
+  output_specs:
+    mask:
+      dtype: int32
+      shape: [-1, -1, -1]
+      optional: false
+      description: Same mask with out-of-bounds labels zeroed; surviving labels keep their original ids.
+    kept:
+      dtype: int32
+      shape: [-1, -1]
+      optional: false
+      description: "[B, max_labels] flags; 1 where that label id's bbox is within bounds, 0 otherwise (including absent and background label 0)."
+  doc_summary: Keep the labels of a labelled mask whose bounding box fits a size window.
+- class_name: cuvis_ai_wur_course.node.kiwi.LabelCropPad
+  category: transform
+  tags: [bbox, hyperspectral, image, mask, torch]
+  icon_svg: "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"#6FAE5C\" stroke-width=\"2.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\">\n  <path d=\"M52 26a20 20 0 0 0-36 0\"/>\n  <path d=\"M52 16v10h-10\"/>\n  <path d=\"M12 38a20 20 0 0 0 36 0\"/>\n  <path d=\"M12 48v-10h10\"/>\n</svg>\n"
+  input_specs:
+    cube:
+      dtype: float32
+      shape: [-1, -1, -1, -1]
+      optional: false
+      description: Hyperspectral or RGB cube, BHWC float32.
+    mask:
+      dtype: int32
+      shape: [-1, -1, -1]
+      optional: false
+      description: Labelled mask [B, H, W] int32; 0 is background.
+  output_specs:
+    crop:
+      dtype: float32
+      shape: [-1, -1, -1, -1]
+      optional: false
+      description: "[B, canvas_size, canvas_size, C]; the selected label's bbox centred on a black canvas, zeros outside the label's own mask."
+  doc_summary: Crop one labelled object out of a cube and centre it on a fixed canvas.
+- class_name: cuvis_ai_wur_course.node.kiwi.LabelKeep
+  category: transform
+  tags: [mask, segmentation, torch]
+  icon_svg: "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"#6FAE5C\" stroke-width=\"2.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\">\n  <path d=\"M52 26a20 20 0 0 0-36 0\"/>\n  <path d=\"M52 16v10h-10\"/>\n  <path d=\"M12 38a20 20 0 0 0 36 0\"/>\n  <path d=\"M12 48v-10h10\"/>\n</svg>\n"
+  input_specs:
+    mask:
+      dtype: int32
+      shape: [1, -1, -1]
+      optional: false
+      description: Labelled mask [1, H, W] int32; 0 is background.
+    object_ids:
+      dtype: int64
+      shape: [1, -1]
+      optional: false
+      description: Label id of every object [1, N], in the order of the decisions.
+    decisions:
+      dtype: bool
+      shape: [-1, 1, 1, 1]
+      optional: false
+      description: One decision per object [N, 1, 1, 1]; true keeps the label.
+  output_specs:
+    mask:
+      dtype: int32
+      shape: [1, -1, -1]
+      optional: false
+      description: The mask with every rejected label set to 0.
+    kept:
+      dtype: int32
+      shape: [1, -1]
+      optional: false
+      description: 1 for every object whose label survived, else 0 [1, N].
+  doc_summary: Write one keep-or-drop decision per object back onto a labelled mask.
+- class_name: cuvis_ai_wur_course.node.features.ResNet18Features
+  category: model
+  tags: [embedding, image, learnable, rgb, torch]
+  icon_svg: "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"#4E7BD4\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\">\n  <circle cx=\"14\" cy=\"20\" r=\"3\"/>\n  <circle cx=\"14\" cy=\"32\" r=\"3\"/>\n  <circle cx=\"14\" cy=\"44\" r=\"3\"/>\n  <circle cx=\"32\" cy=\"16\" r=\"3\"/>\n  <circle cx=\"32\" cy=\"32\" r=\"3\"/>\n  <circle cx=\"32\" cy=\"48\" r=\"3\"/>\n  <circle cx=\"50\" cy=\"26\" r=\"3\"/>\n  <circle cx=\"50\" cy=\"38\" r=\"3\"/>\n  <path d=\"M17 20l12-4M17 32l12-16M17 44l12-28\"/>\n  <path d=\"M17 20l12 12M17 32l12 0M17 44l12-12\"/>\n  <path d=\"M17 20l12 28M17 32l12 16M17 44l12 4\"/>\n  <path d=\"M35 16l12 10M35 32l12-6M35 48l12-22\"/>\n  <path d=\"M35 16l12 22M35 32l12 6M35 48l12-10\"/>\n</svg>\n"
+  input_specs:
+    image:
+      dtype: float32
+      shape: [-1, -1, -1, 3]
+      optional: false
+      description: RGB image [B, H, W, 3] float32 in [0, 1].
+  output_specs:
+    features:
+      dtype: float32
+      shape: [-1, 512]
+      optional: false
+      description: '[B, 512] ResNet-18 feature vector (penultimate layer, pre-fc).'
+  doc_summary: 512-dimensional ResNet-18 feature vector for an RGB image.
+- class_name: cuvis_ai_wur_course.node.models.SpectrumRegressor
+  category: model
+  tags: [hyperspectral, learnable, regression, torch]
+  icon_svg: "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"#4E7BD4\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\">\n  <circle cx=\"14\" cy=\"20\" r=\"3\"/>\n  <circle cx=\"14\" cy=\"32\" r=\"3\"/>\n  <circle cx=\"14\" cy=\"44\" r=\"3\"/>\n  <circle cx=\"32\" cy=\"16\" r=\"3\"/>\n  <circle cx=\"32\" cy=\"32\" r=\"3\"/>\n  <circle cx=\"32\" cy=\"48\" r=\"3\"/>\n  <circle cx=\"50\" cy=\"26\" r=\"3\"/>\n  <circle cx=\"50\" cy=\"38\" r=\"3\"/>\n  <path d=\"M17 20l12-4M17 32l12-16M17 44l12-28\"/>\n  <path d=\"M17 20l12 12M17 32l12 0M17 44l12-12\"/>\n  <path d=\"M17 20l12 28M17 32l12 16M17 44l12 4\"/>\n  <path d=\"M35 16l12 10M35 32l12-6M35 48l12-22\"/>\n  <path d=\"M35 16l12 22M35 32l12 6M35 48l12-10\"/>\n</svg>\n"
+  input_specs:
+    cube:
+      dtype: float32
+      shape: [-1, -1, -1, -1]
+      optional: false
+      description: Hyperspectral cube, BHWC float32; one spectrum per pixel.
+  output_specs:
+    prediction:
+      dtype: float32
+      shape: [-1, -1, -1, 1]
+      optional: false
+      description: Predicted target per pixel, de-standardised to its own units. T = 1.
+  doc_summary: Predict a scalar target per pixel from its spectrum, in the target's own units.
+- class_name: cuvis_ai_wur_course.node.unet.UNetChemicalMapEnsemble
+  category: model
+  tags: [hyperspectral, learnable, regression, torch]
+  icon_svg: "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"#4E7BD4\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\">\n  <circle cx=\"14\" cy=\"20\" r=\"3\"/>\n  <circle cx=\"14\" cy=\"32\" r=\"3\"/>\n  <circle cx=\"14\" cy=\"44\" r=\"3\"/>\n  <circle cx=\"32\" cy=\"16\" r=\"3\"/>\n  <circle cx=\"32\" cy=\"32\" r=\"3\"/>\n  <circle cx=\"32\" cy=\"48\" r=\"3\"/>\n  <circle cx=\"50\" cy=\"26\" r=\"3\"/>\n  <circle cx=\"50\" cy=\"38\" r=\"3\"/>\n  <path d=\"M17 20l12-4M17 32l12-16M17 44l12-28\"/>\n  <path d=\"M17 20l12 12M17 32l12 0M17 44l12-12\"/>\n  <path d=\"M17 20l12 28M17 32l12 16M17 44l12 4\"/>\n  <path d=\"M35 16l12 10M35 32l12-6M35 48l12-22\"/>\n  <path d=\"M35 16l12 22M35 32l12 6M35 48l12-10\"/>\n</svg>\n"
+  input_specs:
+    cube:
+      dtype: float32
+      shape: [-1, -1, -1, -1]
+      optional: false
+      description: Dequantized hyperspectral slice, BHWC float32.
+  output_specs:
+    map:
+      dtype: float32
+      shape: [-1, -1, -1, 1]
+      optional: false
+      description: Predicted chemical-concentration map (percent), mean over the members.
+  doc_summary: Ensemble of ``Conv3Don2D + UNet`` compound models predicting a chemical map.
+- class_name: cuvis_ai_wur_course.node.maps.Dequantize
+  category: transform
+  tags: [hyperspectral, preprocessing, torch]
+  icon_svg: "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"#6FAE5C\" stroke-width=\"2.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\">\n  <path d=\"M52 26a20 20 0 0 0-36 0\"/>\n  <path d=\"M52 16v10h-10\"/>\n  <path d=\"M12 38a20 20 0 0 0 36 0\"/>\n  <path d=\"M12 48v-10h10\"/>\n</svg>\n"
+  input_specs:
+    cube:
+      dtype: float32
+      shape: [-1, -1, -1, -1]
+      optional: false
+      description: Quantized counts held as float32, BHWC.
+    quant_scale:
+      dtype: float32
+      shape: [-1]
+      optional: false
+      description: Per-frame quantization scale.
+    quant_bias:
+      dtype: float32
+      shape: [-1]
+      optional: false
+      description: Per-frame quantization bias.
+  output_specs:
+    cube:
+      dtype: float32
+      shape: [-1, -1, -1, -1]
+      optional: false
+      description: Dequantized reflectance, BHWC float32.
+  doc_summary: Converts a quantized uint16-valued cube back to reflectance.
+- class_name: cuvis_ai_wur_course.node.maps.CenterCrop
+  category: transform
+  tags: [hyperspectral, preprocessing, torch]
+  icon_svg: "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"#6FAE5C\" stroke-width=\"2.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\">\n  <path d=\"M52 26a20 20 0 0 0-36 0\"/>\n  <path d=\"M52 16v10h-10\"/>\n  <path d=\"M12 38a20 20 0 0 0 36 0\"/>\n  <path d=\"M12 48v-10h10\"/>\n</svg>\n"
+  input_specs:
+    cube:
+      dtype: float32
+      shape: [-1, -1, -1, -1]
+      optional: false
+      description: Hyperspectral cube, BHWC float32.
+  output_specs:
+    cube:
+      dtype: float32
+      shape: [-1, -1, -1, -1]
+      optional: false
+      description: Centre-cropped cube.
+  doc_summary: Crops the centre ``crop_height x crop_width`` region of a cube.
+- class_name: cuvis_ai_wur_course.node.maps.GroupWeightedMean
+  category: metric
+  tags: [stateful, torch]
+  icon_svg: "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"#C9615A\" stroke-width=\"2.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\">\n  <path d=\"M10 14v40h44\"/>\n  <rect x=\"16\" y=\"38\" width=\"8\" height=\"12\"/>\n  <rect x=\"28\" y=\"28\" width=\"8\" height=\"22\"/>\n  <rect x=\"40\" y=\"18\" width=\"8\" height=\"32\"/>\n</svg>\n"
+  input_specs:
+    map:
+      dtype: float32
+      shape: [-1, -1, -1, -1]
+      optional: false
+      description: Predicted map, BHWC float32 (one channel per target).
+    mask:
+      dtype: int32
+      shape: [-1, -1, -1]
+      optional: false
+      description: Labelled mask at the map's resolution, 0 = background.
+    group:
+      dtype: int32
+      shape: [-1]
+      optional: false
+      description: Group id per frame (0 <= id < max_groups), e.g. the belly id.
+  output_specs:
+    values:
+      dtype: float32
+      shape: [-1, -1]
+      optional: false
+      description: Running mask-weighted mean per group, over all frames seen so far.
+    counts:
+      dtype: float32
+      shape: [-1]
+      optional: false
+      description: Running count of masked pixels seen per group.
+  doc_summary: Accumulates a mask-weighted per-group mean across a pass of frames.
+- class_name: cuvis_ai_wur_course.node.maps.ChemicalMapStatistics
+  category: metric
+  tags: [hyperspectral, torch]
+  icon_svg: "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"#C9615A\" stroke-width=\"2.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\">\n  <path d=\"M10 14v40h44\"/>\n  <rect x=\"16\" y=\"38\" width=\"8\" height=\"12\"/>\n  <rect x=\"28\" y=\"28\" width=\"8\" height=\"22\"/>\n  <rect x=\"40\" y=\"18\" width=\"8\" height=\"32\"/>\n</svg>\n"
+  input_specs:
+    map:
+      dtype: float32
+      shape: [-1, -1, -1, 1]
+      optional: false
+      description: Predicted chemical map, BHWC float32, one channel.
+    mask:
+      dtype: int32
+      shape: [-1, -1, -1]
+      optional: true
+      description: Labelled mask, at the map's resolution or mask_scale times coarser.
+  output_specs:
+    variance:
+      dtype: float32
+      shape: [-1]
+      optional: false
+      description: Variance of the map over the masked pixels.
+    nugget:
+      dtype: float32
+      shape: [-1]
+      optional: false
+      description: 'Nugget effect C0: variance between direct neighbours.'
+    structured_share:
+      dtype: float32
+      shape: [-1]
+      optional: false
+      description: '1 - C0 / variance: the share of variance that is spatially correlated.'
+    out_of_range_share:
+      dtype: float32
+      shape: [-1]
+      optional: false
+      description: Share of masked pixels outside the 0 to 100 range.
+  doc_summary: Measures how spatially structured a predicted chemical map is.
+- class_name: cuvis_ai_wur_course.node.maps.MaskToMapResolution
+  category: transform
+  tags: [mask, preprocessing, torch]
+  icon_svg: "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"#6FAE5C\" stroke-width=\"2.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\">\n  <path d=\"M52 26a20 20 0 0 0-36 0\"/>\n  <path d=\"M52 16v10h-10\"/>\n  <path d=\"M12 38a20 20 0 0 0 36 0\"/>\n  <path d=\"M12 48v-10h10\"/>\n</svg>\n"
+  input_specs:
+    mask:
+      dtype: int32
+      shape: [-1, -1, -1]
+      optional: false
+      description: Slice mask [B, H, W] int32; 0 is background.
+    map:
+      dtype: float32
+      shape: [-1, -1, -1, 1]
+      optional: false
+      description: Predicted map [B, H', W', 1]; only its spatial size is used.
+  output_specs:
+    mask:
+      dtype: int32
+      shape: [-1, -1, -1]
+      optional: false
+      description: Binary mask [B, Hc / downsample, Wc / downsample] int32 at the map's region, 1 for belly pixels.
+  doc_summary: Bring a slice mask to the region and resolution of a predicted chemical map.

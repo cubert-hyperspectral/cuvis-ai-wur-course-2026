@@ -1,0 +1,26 @@
+metadata:
+  name: resnet18_features
+  description: 'An RGB frame through ImageNet ResNet-18 without its classifier: one
+    512-vector.'
+  created: ''
+  tags:
+  - course
+  - resnet18
+  - features
+  author: Cubert GmbH
+  cuvis_ai_version: 0.14.3
+plugins:
+- cuvis_ai_builtin
+- cuvis_ai_wur_course
+nodes:
+- name: frame
+  class_name: cuvis_ai.node.video.VideoFrameNode
+  hparams:
+    name: null
+- name: features
+  class_name: cuvis_ai_wur_course.node.features.ResNet18Features
+  hparams:
+    weights: imagenet
+connections:
+- source: frame.outputs.rgb_image
+  target: features.inputs.image

@@ -1,0 +1,47 @@
+metadata:
+  name: yolo_rgb
+  description: An RGB frame through the ultralytics YOLO26 detector (the course used
+    yolov8n).
+  created: ''
+  tags:
+  - course
+  - yolo
+  - detection
+  author: Cubert GmbH
+  cuvis_ai_version: 0.14.3
+plugins:
+- cuvis_ai_builtin
+- ultralytics
+nodes:
+- name: frame
+  class_name: cuvis_ai.node.video.VideoFrameNode
+  hparams:
+    name: null
+- name: preprocess
+  class_name: cuvis_ai_ultralytics.node.YOLOPreprocess
+  hparams:
+    stride: 32
+- name: detector
+  class_name: cuvis_ai_ultralytics.node.YOLO26Detection
+  hparams:
+    model_path: yolo26n.pt
+    half_precision: false
+- name: postprocess
+  class_name: cuvis_ai_ultralytics.node.YOLOPostprocess
+  hparams:
+    confidence_threshold: 0.25
+    iou_threshold: 0.7
+    max_detections: 300
+    agnostic_nms: false
+    classes: null
+connections:
+- source: frame.outputs.rgb_image
+  target: preprocess.inputs.rgb_image
+- source: preprocess.outputs.preprocessed
+  target: detector.inputs.preprocessed
+- source: preprocess.outputs.model_input_hw
+  target: postprocess.inputs.model_input_hw
+- source: preprocess.outputs.orig_hw
+  target: postprocess.inputs.orig_hw
+- source: detector.outputs.raw_preds
+  target: postprocess.inputs.raw_preds

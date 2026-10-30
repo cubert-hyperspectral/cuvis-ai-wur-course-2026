@@ -1,0 +1,26 @@
+# Statistical fit of the three PLS models of notebook 01 (spatial, spectral, stacked features).
+#
+# Run from the repository root:
+#   uv run restore-trainrun --trainrun-path trainruns/pork_pls_fusion_fit.yaml --plugins-dir plugins --mode train
+#
+# `pipeline` and `splits_path` are resolved relative to this file; `universe_csv` relative to the
+# working directory (the repository root). The data folder comes from
+# `prepare-course-data pork-features --out-dir data/course/pork_features`.
+name: pork_pls_fusion_fit
+pipeline: ../pipelines/01_pretrained_ai/pork_pls_fusion.yaml
+output_dir: outputs/pork_pls_fusion_fit
+data:
+  data_module: wur_course_npz
+  splits:
+    splits_path: ../data/course/pork_features/splits.json
+  batch_size: 16
+  params:
+    universe_csv: data/course/pork_features/universe.csv
+metric_nodes:
+  - metrics_spatial
+  - metrics_spectral
+  - metrics_stacked
+  - metrics_fusion
+loss_nodes: []
+unfreeze_nodes: []
+freeze_nodes: []

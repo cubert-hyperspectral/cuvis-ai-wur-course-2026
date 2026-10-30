@@ -1,0 +1,76 @@
+metadata:
+  name: unet_ensemble_maps
+  description: 'Dequantised slices through the five-member U-Net ensemble of Engstrom
+    et al.: fat maps, map statistics against the slice mask the course already ships
+    at the U-Net output grid, and the mask-weighted belly value.'
+  created: ''
+  tags:
+  - course
+  - unet
+  - chemical-map
+  author: Cubert GmbH
+  cuvis_ai_version: 0.14.3
+plugins:
+- cuvis_ai_builtin
+- cuvis_ai_wur_course
+nodes:
+- name: frame
+  class_name: cuvis_ai_wur_course.node.source.CourseFrame
+  hparams:
+    name: null
+- name: dequantize
+  class_name: cuvis_ai_wur_course.node.maps.Dequantize
+  hparams:
+    name: null
+- name: unet
+  class_name: cuvis_ai_wur_course.node.unet.UNetChemicalMapEnsemble
+  hparams:
+    n_members: 5
+    member_ids:
+    - 1
+    - 2
+    - 3
+    - 4
+    - 5
+    weights: hf
+    hf_repo: Sm00thix/unet_chemical_map
+    hf_revision: 9683a7ae6019c17e0e03f38a5e0d3c7dee9210e2
+    input_channels: 62
+    conv3d_kernel:
+    - 7
+    - 2
+    - 2
+    conv3d_filters: 1
+    out_channels: 1
+    pad: false
+    bilinear: true
+    normalization: null
+- name: stats
+  class_name: cuvis_ai_wur_course.node.maps.ChemicalMapStatistics
+  hparams:
+    mask_scale: 1
+    eps: 1.0e-12
+- name: belly_mean
+  class_name: cuvis_ai_wur_course.node.maps.GroupWeightedMean
+  hparams:
+    max_groups: 256
+    n_targets: 1
+connections:
+- source: frame.outputs.cube
+  target: dequantize.inputs.cube
+- source: frame.outputs.quant_scale
+  target: dequantize.inputs.quant_scale
+- source: frame.outputs.quant_bias
+  target: dequantize.inputs.quant_bias
+- source: frame.outputs.mask
+  target: stats.inputs.mask
+- source: frame.outputs.mask
+  target: belly_mean.inputs.mask
+- source: frame.outputs.group
+  target: belly_mean.inputs.group
+- source: dequantize.outputs.cube
+  target: unet.inputs.cube
+- source: unet.outputs.map
+  target: stats.inputs.map
+- source: unet.outputs.map
+  target: belly_mean.inputs.map

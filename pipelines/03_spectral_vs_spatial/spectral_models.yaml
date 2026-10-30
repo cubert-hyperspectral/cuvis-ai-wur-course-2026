@@ -1,0 +1,139 @@
+metadata:
+  name: spectral_models
+  description: 'Mean spectra: the course''s global scalar standardisation, a three-component
+    dataset PCA, PLS selected on hold-out split 1, and the course''s MLP and 1D ResNet
+    from their trained weights, each with pooled regression metrics.'
+  created: ''
+  tags:
+  - course
+  - pls
+  - mlp
+  - resnet1d
+  - pca
+  author: Cubert GmbH
+  cuvis_ai_version: 0.14.3
+plugins:
+- cuvis_ai_builtin
+- cuvis_ai_wur_course
+nodes:
+- name: frame
+  class_name: cuvis_ai_wur_course.node.source.CourseFrame
+  hparams:
+    name: null
+- name: standardize
+  class_name: cuvis_ai_wur_course.node.scaling.GlobalScalarStandardizer
+  hparams:
+    ddof: 0
+    eps: 1.0e-06
+    exclude_folds:
+    - 1
+- name: pca
+  class_name: cuvis_ai_wur_course.node.pca.DatasetPCA
+  hparams:
+    input_channels: 124
+    n_components: 3
+    eps: 1.0e-06
+    exclude_folds:
+    - 1
+- name: explained_variance
+  class_name: cuvis_ai.node.metrics.ExplainedVarianceMetric
+  hparams: {}
+- name: pls
+  class_name: cuvis_ai_wur_course.node.regression.PLSRegression
+  hparams:
+    input_channels: 124
+    n_targets: 1
+    n_components: null
+    max_components: 20
+    holdout_folds:
+    - 1
+    refit_on_holdout: false
+    eps: 1.0e-12
+- name: mean_pls
+  class_name: cuvis_ai_wur_course.node.fusion.SpatialMean
+  hparams:
+    name: null
+- name: metrics_pls
+  class_name: cuvis_ai_wur_course.node.metrics.RegressionMetrics
+  hparams: {}
+- name: mlp
+  class_name: cuvis_ai_wur_course.node.models.SpectrumRegressor
+  hparams:
+    arch: mlp
+    input_channels: 124
+    weights_path: data/course/models/mlp/best_weights.pt
+    hidden_dims:
+    - 256
+    - 128
+    dropout: 0.0
+    x_mean: 0.031223
+    x_std: 0.04972
+    y_mean: 37.9531
+    y_std: 13.7968
+- name: mean_mlp
+  class_name: cuvis_ai_wur_course.node.fusion.SpatialMean
+  hparams:
+    name: null
+- name: metrics_mlp
+  class_name: cuvis_ai_wur_course.node.metrics.RegressionMetrics
+  hparams: {}
+- name: resnet1d
+  class_name: cuvis_ai_wur_course.node.models.SpectrumRegressor
+  hparams:
+    arch: resnet1d
+    input_channels: 124
+    weights_path: data/course/models/resnet1d/best_weights.pt
+    hidden_dims:
+    - 256
+    - 128
+    dropout: 0.0
+    x_mean: 0.031223
+    x_std: 0.04972
+    y_mean: 37.9531
+    y_std: 13.7968
+- name: mean_resnet1d
+  class_name: cuvis_ai_wur_course.node.fusion.SpatialMean
+  hparams:
+    name: null
+- name: metrics_resnet1d
+  class_name: cuvis_ai_wur_course.node.metrics.RegressionMetrics
+  hparams: {}
+connections:
+- source: frame.outputs.cube
+  target: standardize.inputs.cube
+- source: frame.outputs.fold
+  target: standardize.inputs.fold
+- source: frame.outputs.cube
+  target: pca.inputs.cube
+- source: frame.outputs.fold
+  target: pca.inputs.fold
+- source: frame.outputs.target
+  target: pls.inputs.target
+- source: frame.outputs.fold
+  target: pls.inputs.fold
+- source: frame.outputs.cube
+  target: pls.inputs.cube
+- source: frame.outputs.target
+  target: metrics_pls.inputs.target
+- source: frame.outputs.cube
+  target: mlp.inputs.cube
+- source: frame.outputs.target
+  target: metrics_mlp.inputs.target
+- source: frame.outputs.cube
+  target: resnet1d.inputs.cube
+- source: frame.outputs.target
+  target: metrics_resnet1d.inputs.target
+- source: pca.outputs.explained_variance_ratio
+  target: explained_variance.inputs.explained_variance_ratio
+- source: pls.outputs.prediction
+  target: mean_pls.inputs.prediction
+- source: mean_pls.outputs.prediction
+  target: metrics_pls.inputs.prediction
+- source: mlp.outputs.prediction
+  target: mean_mlp.inputs.prediction
+- source: mean_mlp.outputs.prediction
+  target: metrics_mlp.inputs.prediction
+- source: resnet1d.outputs.prediction
+  target: mean_resnet1d.inputs.prediction
+- source: mean_resnet1d.outputs.prediction
+  target: metrics_resnet1d.inputs.prediction

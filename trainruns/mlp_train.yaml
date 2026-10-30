@@ -1,0 +1,61 @@
+# Gradient training of the course's MLP spectrum regressor from random weights (notebook 03).
+#
+# Run from the repository root:
+#   uv run restore-trainrun --trainrun-path trainruns/mlp_train.yaml --plugins-dir plugins --mode train
+#
+# Course settings kept: AdamW with lr 1e-2 and weight decay 1e-4, MSE in fat percent, one batch
+# per epoch (97 training spectra fit in one batch of 128), ReduceLROnPlateau with factor 0.1,
+# patience 39 and a floor of 1e-7, early stopping after 200 epochs without improvement, 2000
+# epochs at most, seed 42.
+# Deviations from the course loop: no 100-epoch burn-in before early stopping counts, no restore
+# of the best checkpoint on every learning-rate drop (the checkpoint callback keeps the best epoch
+# instead), and no post-hoc bias and scale correction of the predictions.
+name: mlp_train
+pipeline: ../pipelines/03_spectral_vs_spatial/mlp_train.yaml
+output_dir: outputs/mlp_train
+data:
+  data_module: wur_course_npz
+  splits:
+    # train = splits 2 to 5 and val = split 1, as in the course; splits.json keeps split 1
+    # inside train for the hold-out fits.
+    splits_path: ../data/course/mean_spectra_03/splits_gradient.json
+  batch_size: 128
+  params:
+    universe_csv: data/course/mean_spectra_03/universe.csv
+training:
+  seed: 42
+  optimizer:
+    name: adamw
+    lr: 0.01
+    weight_decay: 0.0001
+  scheduler:
+    name: reduce_on_plateau
+    monitor: val/loss
+    mode: min
+    factor: 0.1
+    patience: 39
+    min_lr: 1.0e-07
+  max_epochs: 2000
+  accelerator: auto
+  enable_checkpointing: true
+  log_every_n_steps: 1
+  callbacks:
+    checkpoint:
+      dirpath: outputs/mlp_train/checkpoints
+      monitor: val/loss
+      mode: min
+      save_top_k: 1
+    early_stopping:
+      - monitor: val/loss
+        mode: min
+        patience: 200
+        min_delta: 0.0
+    learning_rate_monitor:
+      logging_interval: epoch
+unfreeze_nodes:
+  - mlp
+loss_nodes:
+  - loss
+metric_nodes:
+  - metrics
+freeze_nodes: []

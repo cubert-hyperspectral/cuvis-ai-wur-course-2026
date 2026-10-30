@@ -1,0 +1,57 @@
+metadata:
+  name: mlp_train
+  description: The course's mlp spectrum regressor from random weights with the MSE
+    loss in fat percent and pooled regression metrics, for the gradient trainrun.
+  created: ''
+  tags:
+  - course
+  - mlp
+  - training
+  author: Cubert GmbH
+  cuvis_ai_version: 0.14.3
+plugins:
+- cuvis_ai_builtin
+- cuvis_ai_wur_course
+nodes:
+- name: frame
+  class_name: cuvis_ai_wur_course.node.source.CourseFrame
+  hparams:
+    name: null
+- name: mlp
+  class_name: cuvis_ai_wur_course.node.models.SpectrumRegressor
+  hparams:
+    arch: mlp
+    input_channels: 124
+    weights_path: null
+    hidden_dims:
+    - 256
+    - 128
+    dropout: 0.0
+    x_mean: 0.031223
+    x_std: 0.04972
+    y_mean: 37.9531
+    y_std: 13.7968
+- name: mean
+  class_name: cuvis_ai_wur_course.node.fusion.SpatialMean
+  hparams:
+    name: null
+- name: loss
+  class_name: cuvis_ai_wur_course.node.losses.RegressionMSELoss
+  hparams:
+    reduction: mean
+- name: metrics
+  class_name: cuvis_ai_wur_course.node.metrics.RegressionMetrics
+  hparams: {}
+connections:
+- source: frame.outputs.cube
+  target: mlp.inputs.cube
+- source: frame.outputs.target
+  target: loss.inputs.target
+- source: frame.outputs.target
+  target: metrics.inputs.target
+- source: mlp.outputs.prediction
+  target: mean.inputs.prediction
+- source: mean.outputs.prediction
+  target: loss.inputs.prediction
+- source: mean.outputs.prediction
+  target: metrics.inputs.prediction
