@@ -117,6 +117,8 @@ def reproduction_table(
     for name, course, ours, tolerance in rows:
         if synthetic:
             verdict = "synthetic data, not compared"
+        elif isinstance(course, str) and isinstance(ours, str) and tolerance == 0:
+            verdict = "pass" if course == ours else "open deviation"
         elif (
             tolerance is None
             or not isinstance(course, (int, float))

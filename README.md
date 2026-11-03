@@ -12,7 +12,7 @@ graphs in the open and end in a table that compares our numbers with the course'
 
 | Course notebook | Here | What it covers |
 |---|---|---|
-| `using_pretrained_ai.ipynb` | `notebooks/01_pretrained_ai.ipynb` | SAM3 on a kiwi tray with the course's size and spectral-angle filters, YOLO26 on a photo, ResNet-18 features, PLS fusion for pork belly fat |
+| `using_pretrained_ai.ipynb` | `notebooks/01_pretrained_ai.ipynb` | SAM3 on a kiwi tray with the course's size and spectral-angle filters, the course's yolov8n and the plugin's YOLO26 on the two photos, ResNet-18 features, PLS fusion for pork belly fat |
 | `end2end_unet_chemical_maps.ipynb` | `notebooks/02_unet_chemical_maps.ipynb` | The study's U-Net ensemble as chemical maps, next to the pixel-wise PLS map, with the map statistics of the course |
 | `end2end_spectral_vs_spatial_models.ipynb` | `notebooks/03_spectral_vs_spatial.ipynb` | Standardisation, PCA, PLS, an MLP and a 1D ResNet on mean spectra, with their trainruns |
 
@@ -111,7 +111,8 @@ Each notebook names its source notebook and commit, builds its pipelines cell by
 metrics off the metric nodes, and ends with the reproduction table. The baked outputs in this
 repository come from the course data. Every numeric row passes its tolerance except the best
 validation MSE of our own 1D ResNet trainrun, listed as an open deviation with its cause; the kiwi
-mask counts and the YOLO labels are reported next to the course's SAM v1 and yolov8n results.
+mask counts are reported next to the course's SAM v1 counts, the yolov8n label counts match the
+course's, and the plugin's YOLO26 labels are reported next to them.
 
 ## Nodes
 

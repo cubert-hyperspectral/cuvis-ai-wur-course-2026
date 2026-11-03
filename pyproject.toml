@@ -98,8 +98,8 @@ torch = { index = "pytorch-cu128" }
 # torchvision MUST come from the same cu128 index as torch, or the prebuilt ops
 # (torchvision::nms) mismatch torch's ABI at import.
 torchvision = { index = "pytorch-cu128" }
-cuvis-ai-sam3 = { git = "https://github.com/cubert-hyperspectral/cuvis-ai-sam3.git", rev = "v0.5.1" }
-cuvis-ai-ultralytics = { git = "https://github.com/cubert-hyperspectral/cuvis-ai-ultralytics.git", rev = "v0.1.4" }
+cuvis-ai-sam3 = { git = "https://github.com/cubert-hyperspectral/cuvis-ai-sam3.git", rev = "v0.5.2" }
+cuvis-ai-ultralytics = { git = "https://github.com/cubert-hyperspectral/cuvis-ai-ultralytics.git", rev = "v0.1.5" }
 
 [[tool.uv.index]]
 name = "pytorch-cu128"

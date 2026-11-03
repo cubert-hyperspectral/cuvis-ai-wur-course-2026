@@ -714,8 +714,8 @@ wheels = [
 
 [[package]]
 name = "cuvis-ai-sam3"
-version = "0.5.1"
-source = { git = "https://github.com/cubert-hyperspectral/cuvis-ai-sam3.git?rev=v0.5.1#e2e237591ecc0750ad46fbd8389d3949a9d68fbd" }
+version = "0.5.2"
+source = { git = "https://github.com/cubert-hyperspectral/cuvis-ai-sam3.git?rev=v0.5.2#12b3f62cf4f41c4751976e0fd912f7a8c227916a" }
 dependencies = [
     { name = "click" },
     { name = "cuvis-ai-core" },
@@ -777,8 +777,8 @@ proto = [
 
 [[package]]
 name = "cuvis-ai-ultralytics"
-version = "0.1.4"
-source = { git = "https://github.com/cubert-hyperspectral/cuvis-ai-ultralytics.git?rev=v0.1.4#06699e49e6b4fc1e2568edc1ed671e32ee1e4dc3" }
+version = "0.1.5"
+source = { git = "https://github.com/cubert-hyperspectral/cuvis-ai-ultralytics.git?rev=v0.1.5#cfad358ddff3eb241cb40703abbc365fb9cbea29" }
 dependencies = [
     { name = "click" },
     { name = "cuvis-ai-core" },
@@ -846,9 +846,9 @@ requires-dist = [
     { name = "cuvis-ai", specifier = ">=0.20.0" },
     { name = "cuvis-ai-core", specifier = ">=0.19.0" },
     { name = "cuvis-ai-dataloader", specifier = ">=0.8.2" },
-    { name = "cuvis-ai-sam3", marker = "extra == 'plugins'", git = "https://github.com/cubert-hyperspectral/cuvis-ai-sam3.git?rev=v0.5.1" },
+    { name = "cuvis-ai-sam3", marker = "extra == 'plugins'", git = "https://github.com/cubert-hyperspectral/cuvis-ai-sam3.git?rev=v0.5.2" },
     { name = "cuvis-ai-schemas", specifier = ">=0.14.2,<0.15" },
-    { name = "cuvis-ai-ultralytics", marker = "extra == 'plugins'", git = "https://github.com/cubert-hyperspectral/cuvis-ai-ultralytics.git?rev=v0.1.4" },
+    { name = "cuvis-ai-ultralytics", marker = "extra == 'plugins'", git = "https://github.com/cubert-hyperspectral/cuvis-ai-ultralytics.git?rev=v0.1.5" },
     { name = "detect-secrets", marker = "extra == 'dev'" },
     { name = "huggingface-hub" },
     { name = "ikpls", marker = "extra == 'dev'", specifier = ">=6.1" },

@@ -132,8 +132,8 @@ class ResNet18Features(Node):
         """Preprocess and run the ResNet-18 backbone, returning a flat feature vector."""
         preprocessed = self._preprocess(image)
         features = self.backbone(preprocessed)
-        # Under an autocast a node upstream left switched on (the SAM3 plugin does) the
-        # backbone emits bfloat16; the port promises float32 whatever the global state.
+        # Under a bfloat16 autocast the backbone emits bfloat16; the port promises float32
+        # whatever autocast state the caller runs under.
         return {"features": features.reshape(features.shape[0], -1).to(torch.float32)}
 
     def freeze(self) -> None:
