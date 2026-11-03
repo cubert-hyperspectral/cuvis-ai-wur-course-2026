@@ -228,8 +228,8 @@ def build_yolo_rgb() -> None:
 
     pipe = CuvisPipeline("yolo_rgb")
     frame = VideoFrameNode(name="frame")
-    preprocess = YOLOPreprocess(name="preprocess")
-    detector = YOLO26Detection(name="detector", model_path="yolo26n.pt")
+    preprocess = YOLOPreprocess(name="preprocess", imgsz=640)
+    detector = YOLO26Detection(name="detector", model_path="yolov8n.pt")
     postprocess = YOLOPostprocess(name="postprocess", confidence_threshold=0.25)
     pipe.connect(
         (frame.outputs.rgb_image, preprocess.inputs.rgb_image),
@@ -243,7 +243,8 @@ def build_yolo_rgb() -> None:
         "01_pretrained_ai/yolo_rgb.yaml",
         ["cuvis_ai_builtin", "ultralytics"],
         "yolo_rgb",
-        "An RGB frame through the ultralytics YOLO26 detector (the course used yolov8n).",
+        "An RGB frame through the ultralytics nodes with the course's yolov8n weights at imgsz 640 "
+        "(the detector node loads any ultralytics weight file).",
         ["course", "yolo", "detection"],
     )
 

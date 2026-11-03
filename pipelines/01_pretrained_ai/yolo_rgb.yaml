@@ -1,7 +1,7 @@
 metadata:
   name: yolo_rgb
-  description: An RGB frame through the ultralytics YOLO26 detector (the course used
-    yolov8n).
+  description: An RGB frame through the ultralytics nodes with the course's yolov8n
+    weights at imgsz 640 (the detector node loads any ultralytics weight file).
   created: ''
   tags:
   - course
@@ -21,10 +21,11 @@ nodes:
   class_name: cuvis_ai_ultralytics.node.YOLOPreprocess
   hparams:
     stride: 32
+    imgsz: 640
 - name: detector
   class_name: cuvis_ai_ultralytics.node.YOLO26Detection
   hparams:
-    model_path: yolo26n.pt
+    model_path: yolov8n.pt
     half_precision: false
 - name: postprocess
   class_name: cuvis_ai_ultralytics.node.YOLOPostprocess
