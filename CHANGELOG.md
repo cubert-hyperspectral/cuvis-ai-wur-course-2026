@@ -31,6 +31,7 @@
 - Notebook 01 runs the course's yolov8n and the plugin's YOLO26 on both course photos (the kiwi tray and the carrots) through the ultralytics nodes at `imgsz=640`; the yolov8n label counts match the course's and are judged in the reproduction table, the YOLO26 counts are reported next to them.
 - The `plugins` extra pins cuvis-ai-sam3 v0.5.2 (autocast state restored after the model build, outputs on the input device) and cuvis-ai-ultralytics v0.1.5 (RGB kept before the model, `imgsz` letterbox); notebook 01 no longer builds the kiwi pipeline inside a disabled autocast.
 - The three notebooks are baked on the course data; the reproduction tables compare against the course numbers.
+- The pipeline diagrams in the notebooks (`utils.show_pipeline`) and the PNGs under `pipelines/` show each node's name under its class title, so the three `PLSRegression` cards of the pork fusion graph and the metric cards read apart.
 
 ### Fixed
 - `LabelKeep` follows the mask device and `LabelCropPad` the cube device, so the kiwi pipeline runs on the GPU with the SAM3 node's cpu mask.

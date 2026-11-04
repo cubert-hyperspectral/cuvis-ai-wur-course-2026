@@ -1,24 +1,42 @@
 """Thin matplotlib rendering and table helpers for the course notebooks.
 
 Nothing here builds or wires a pipeline and nothing provisions data: the notebooks do
-that in the open. These functions only draw what the nodes produced and lay the
-reproduction rows out as a table.
+that in the open. These functions only draw a wired pipeline and what its nodes produced,
+and lay the reproduction rows out as a table.
 """
 
 from __future__ import annotations
 
 from collections.abc import Sequence
 
+import graphviz
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import torch
+from cuvis_ai_core.pipeline.pipeline import CuvisPipeline
+from cuvis_ai_core.pipeline.visualizer import PipelineVisualizer
+from IPython.display import HTML
 
 
 def _to_numpy(value: torch.Tensor | np.ndarray) -> np.ndarray:
     if isinstance(value, torch.Tensor):
         return value.detach().cpu().numpy()
     return np.asarray(value)
+
+
+def show_pipeline(pipeline: CuvisPipeline) -> HTML:
+    """Draw the pipeline inline with each node's name under its class title.
+
+    The bare ``pipeline`` repr labels the cards by class only, so the three ``PLSRegression``
+    cards of the pork fusion graph look alike; this asks the same Graphviz renderer for the
+    names as well. The SVG keeps its natural size inside a box that scrolls sideways, so the
+    small name lines stay legible on the wide graphs.
+    """
+    dot = PipelineVisualizer(pipeline).to_graphviz(show_node_name=True)
+    svg = graphviz.Source(dot).pipe(format="svg").decode("utf-8")
+    svg = svg[svg.find("<svg") :]
+    return HTML(f'<div style="overflow:auto">{svg}</div>')
 
 
 def show_images(panels: Sequence[tuple[str, torch.Tensor | np.ndarray]], cmap: str | None = None):
