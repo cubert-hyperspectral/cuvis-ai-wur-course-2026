@@ -10,7 +10,7 @@ metadata:
   - spectral-match
   - resnet18
   author: Cubert GmbH
-  cuvis_ai_version: 0.14.3
+  cuvis_ai_version: 0.14.4
 plugins:
 - cuvis_ai_builtin
 - cuvis_ai_wur_course

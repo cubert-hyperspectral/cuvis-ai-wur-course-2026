@@ -9,7 +9,7 @@ metadata:
   - pls
   - fusion
   author: Cubert GmbH
-  cuvis_ai_version: 0.14.3
+  cuvis_ai_version: 0.14.4
 plugins:
 - cuvis_ai_builtin
 - cuvis_ai_wur_course
@@ -18,16 +18,21 @@ nodes:
   class_name: cuvis_ai_wur_course.node.source.CourseFrame
   hparams:
     name: null
-- name: center
-  class_name: cuvis_ai.node.pretreatments.scaling.MeanCenter
+- name: standardize
+  class_name: cuvis_ai.node.pretreatments.standardize.Standardize
   hparams:
-    max_fit_pixels: 20000
-    fit_seed: 0
-- name: scale
-  class_name: cuvis_ai.node.pretreatments.scaling.UnitVarianceScaling
-  hparams:
-    max_fit_pixels: 20000
-    fit_seed: 0
+    axis: channel
+    with_mean: true
+    with_std: true
+    stats: fit
+    mean: null
+    std: null
+    ddof: 1
+    eps: 1.0e-08
+    eps_mode: floor
+    exclude_folds: null
+    max_initialization_frames: null
+    layout: bhwc
 - name: spatial_block
   class_name: cuvis_ai_wur_course.node.fusion.ChannelSlice
   hparams:
@@ -98,7 +103,7 @@ nodes:
   hparams: {}
 connections:
 - source: frame.outputs.cube
-  target: center.inputs.cube
+  target: standardize.inputs.cube
 - source: frame.outputs.wavelengths
   target: spatial_block.inputs.wavelengths
 - source: frame.outputs.wavelengths
@@ -123,13 +128,11 @@ connections:
   target: metrics_stacked.inputs.target
 - source: frame.outputs.target
   target: metrics_fusion.inputs.target
-- source: center.outputs.cube
-  target: scale.inputs.cube
-- source: scale.outputs.cube
+- source: standardize.outputs.cube
   target: spatial_block.inputs.cube
-- source: scale.outputs.cube
+- source: standardize.outputs.cube
   target: spectral_block.inputs.cube
-- source: scale.outputs.cube
+- source: standardize.outputs.cube
   target: pls_stacked.inputs.cube
 - source: spatial_block.outputs.cube
   target: pls_spatial.inputs.cube

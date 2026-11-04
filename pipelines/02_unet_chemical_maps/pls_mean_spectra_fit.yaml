@@ -9,7 +9,7 @@ metadata:
   - pls
   - fit
   author: Cubert GmbH
-  cuvis_ai_version: 0.14.3
+  cuvis_ai_version: 0.14.4
 plugins:
 - cuvis_ai_builtin
 - cuvis_ai_wur_course
@@ -24,9 +24,20 @@ nodes:
     input_channels: 124
     bin_size: 2
 - name: snv
-  class_name: cuvis_ai.node.pretreatments.snv.SNVCorrection
+  class_name: cuvis_ai.node.pretreatments.standardize.Standardize
   hparams:
+    axis: spectrum
+    with_mean: true
+    with_std: true
+    stats: sample
+    mean: null
+    std: null
+    ddof: 0
     eps: 1.0e-08
+    eps_mode: floor
+    exclude_folds: null
+    max_initialization_frames: null
+    layout: bhwc
 - name: sg
   class_name: cuvis_ai_wur_course.node.pretreatment.SavitzkyGolayInterp
   hparams:

@@ -121,7 +121,7 @@ course's, and the plugin's YOLO26 labels are reported next to them.
 | `node/source.py` | `CourseFrame` |
 | `node/regression.py` | `PLSRegression` (fixed or hold-out selected components, pooled SSE) |
 | `node/metrics.py`, `node/losses.py` | `RegressionMetrics`, `RegressionMSELoss` |
-| `node/scaling.py`, `node/pca.py` | `GlobalScalarStandardizer`, `DatasetPCA` |
+| `node/pca.py` | `DatasetPCA` |
 | `node/pretreatment.py` | `SpectralBinning`, `SavitzkyGolayInterp` |
 | `node/fusion.py` | `ChannelSlice`, `PredictionMean`, `SpatialMean` |
 | `node/kiwi.py`, `node/features.py` | `LabelBBoxFilter`, `LabelCropPad`, `LabelKeep`, `ResNet18Features` |

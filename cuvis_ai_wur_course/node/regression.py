@@ -157,7 +157,7 @@ class PLSRegression(Node):
       count; ``holdout_folds`` and ``refit_on_holdout`` are ignored.
 
     The course's own preprocessing (SNV, autoscaling) centers and scales
-    with ``ddof=0`` while cuvis-ai's ``UnitVarianceScaling`` uses ``ddof=1``.
+    with ``ddof=0`` while cuvis-ai's ``Standardize`` defaults to ``ddof=1``.
     The two differ only by one scalar factor applied uniformly to every
     channel of ``X``, and PLS predictions (as well as the pooled-SSE
     component selection) are invariant to a uniform rescaling of ``X``: the

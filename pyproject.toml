@@ -36,7 +36,7 @@ classifiers = [
 ]
 
 dependencies = [
-  "cuvis-ai>=0.20.0",
+  "cuvis-ai>=0.21.0",
   "cuvis-ai-core>=0.19.0",
   "cuvis-ai-schemas>=0.14.2,<0.15",
   "cuvis-ai-dataloader>=0.8.2",

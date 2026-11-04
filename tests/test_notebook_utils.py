@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 
 import pytest
-from cuvis_ai.node.pretreatments.scaling import MeanCenter, UnitVarianceScaling
+from cuvis_ai.node.pretreatments.standardize import Standardize
 from cuvis_ai_core.pipeline.pipeline import CuvisPipeline
 
 pytestmark = pytest.mark.unit
@@ -18,7 +18,8 @@ import utils  # noqa: E402
 
 def test_show_pipeline_writes_the_node_names_under_the_class_titles() -> None:
     graphviz = pytest.importorskip("graphviz")
-    center, scale = MeanCenter(name="center_pork"), UnitVarianceScaling(name="scale_pork")
+    center = Standardize(name="center_pork", axis="channel", with_std=False)
+    scale = Standardize(name="scale_pork", axis="channel", with_mean=False)
     pipeline = CuvisPipeline("named")
     pipeline.connect((center.outputs.cube, scale.inputs.cube))
     try:
@@ -26,7 +27,7 @@ def test_show_pipeline_writes_the_node_names_under_the_class_titles() -> None:
     except graphviz.ExecutableNotFound:
         pytest.skip("the Graphviz dot binary is not installed")
     assert "<svg" in shown.data
-    for text in ("MeanCenter", "center_pork", "UnitVarianceScaling", "scale_pork"):
+    for text in ("Standardize", "center_pork", "scale_pork"):
         assert text in _visible_text(shown.data)
     # The bare repr is what the helper improves on: it draws the class titles only (the name
     # is still in the SVG as the node's id, which no reader sees).
