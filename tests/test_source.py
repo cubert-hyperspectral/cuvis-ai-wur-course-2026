@@ -146,6 +146,61 @@ def test_reload_smoke(tmp_path: Path) -> None:
     assert torch.allclose(before["cube"], after["cube"])
 
 
+# ----- keys: per-instance port trim -------------------------------------------
+
+
+def test_default_keeps_all_eight_ports() -> None:
+    node = CourseFrame()
+    assert set(node.INPUT_SPECS) == set(CourseFrame.INPUT_SPECS)
+    assert len(node.OUTPUT_SPECS) == 8
+
+
+def test_keys_trim_the_ports_of_one_instance_only() -> None:
+    node = CourseFrame(keys=("target", "fold"))
+    assert set(node.INPUT_SPECS) == {"cube", "target", "fold"}
+    assert set(node.OUTPUT_SPECS) == {"cube", "target", "fold"}
+    assert len(CourseFrame.INPUT_SPECS) == 8  # the class keeps every port for the catalog
+
+
+def test_wavelengths_stay_only_when_named() -> None:
+    assert set(CourseFrame(keys=("wavelengths",)).OUTPUT_SPECS) == {"cube", "wavelengths"}
+    assert set(CourseFrame(keys=()).OUTPUT_SPECS) == {"cube"}
+
+
+def test_an_unknown_key_is_refused() -> None:
+    with pytest.raises(ValueError, match="bogus"):
+        CourseFrame(keys=("target", "bogus"))
+
+
+def test_a_trimmed_frame_emits_only_its_declared_outputs() -> None:
+    node = CourseFrame(keys=("target",))
+    out = node(**_mean_spectra_batch())  # the batch also carries wavelengths and fold
+    assert set(out) == {"cube", "target"}
+
+
+def test_a_trimmed_frame_in_a_pipeline_ignores_the_batch_keys_it_does_not_declare() -> None:
+    pipeline = CuvisPipeline("course_frame_trim_test")
+    frame = CourseFrame(name="frame", keys=("mask",))
+    sink = _CubeSink(name="sink")
+    pipeline.connect(frame.outputs.cube, sink.inputs.cube)
+    batch = _image_batch()
+    out = pipeline.forward(batch=batch)
+    assert torch.allclose(out[("sink", "seen")], batch["cube"])
+
+
+def test_keys_survive_the_yaml_round_trip(tmp_path: Path) -> None:
+    pipeline = CuvisPipeline("course_frame_keys_reload_test")
+    frame = CourseFrame(name="frame", keys=("mask", "group"))
+    sink = _CubeSink(name="sink")
+    pipeline.connect(frame.outputs.cube, sink.inputs.cube)
+    out_path = tmp_path / "pipeline.yaml"
+    pipeline.save_to_file(str(out_path))
+
+    rebuilt = PipelineBuilder().build_from_config(str(out_path))
+    rebuilt_frame = {n.name: n for n in rebuilt.nodes()}["frame"]
+    assert set(rebuilt_frame.OUTPUT_SPECS) == {"cube", "mask", "group"}
+
+
 # ----- 4. export smoke ------------------------------------------------------
 #
 # Not applicable: CourseFrame is a source node and, like the builtin CU3SDataNode, hands
