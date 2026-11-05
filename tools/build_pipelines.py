@@ -33,8 +33,7 @@ from cuvis_ai.node.deciders.binary_decider import ScoreThreshold
 from cuvis_ai.node.metrics import DistinctLabelCount, ExplainedVarianceMetric
 from cuvis_ai.node.numpy_file import NpyReader
 from cuvis_ai.node.pretreatments.logarithm import Logarithm
-from cuvis_ai.node.pretreatments.scaling import MeanCenter, UnitVarianceScaling
-from cuvis_ai.node.pretreatments.snv import SNVCorrection
+from cuvis_ai.node.pretreatments.standardize import Standardize
 from cuvis_ai.node.spectral_angle_mapper import SpectralAngleMapper
 from cuvis_ai.node.spectral_extractor import SignaturesToReferences, SpectralSignatureExtractor
 from cuvis_ai.node.video import VideoFrameNode
@@ -57,7 +56,6 @@ from cuvis_ai_wur_course.node.models import SpectrumRegressor
 from cuvis_ai_wur_course.node.pca import DatasetPCA
 from cuvis_ai_wur_course.node.pretreatment import SavitzkyGolayInterp, SpectralBinning
 from cuvis_ai_wur_course.node.regression import PLSRegression
-from cuvis_ai_wur_course.node.scaling import GlobalScalarStandardizer
 from cuvis_ai_wur_course.node.source import CourseFrame
 from cuvis_ai_wur_course.node.unet import UNetChemicalMapEnsemble
 
@@ -280,8 +278,7 @@ def _regression_head(
 def build_pork_pls_fusion() -> None:
     pipe = CuvisPipeline("pork_pls_fusion")
     frame = CourseFrame(name="frame")
-    center = MeanCenter(name="center")
-    scale = UnitVarianceScaling(name="scale")
+    standardize = Standardize(name="standardize", axis="channel")
     spatial_block = ChannelSlice(name="spatial_block", start=0, stop=PORK_SPATIAL)
     spectral_block = ChannelSlice(
         name="spectral_block", start=PORK_SPATIAL, stop=PORK_SPATIAL + PORK_SPECTRAL
@@ -297,17 +294,16 @@ def build_pork_pls_fusion() -> None:
         name="pls_stacked", input_channels=PORK_SPATIAL + PORK_SPECTRAL, **pls_kwargs
     )
     pipe.connect(
-        (frame.outputs.cube, center.inputs.cube),
-        (center.outputs.cube, scale.inputs.cube),
-        (scale.outputs.cube, spatial_block.inputs.cube),
-        (scale.outputs.cube, spectral_block.inputs.cube),
+        (frame.outputs.cube, standardize.inputs.cube),
+        (standardize.outputs.cube, spatial_block.inputs.cube),
+        (standardize.outputs.cube, spectral_block.inputs.cube),
         # Connected on purpose: an unconnected optional `wavelengths` port would otherwise be
         # auto-filled from the batch's [B, C] float wavelengths and fail its int32 [C] spec.
         (frame.outputs.wavelengths, spatial_block.inputs.wavelengths),
         (frame.outputs.wavelengths, spectral_block.inputs.wavelengths),
         (spatial_block.outputs.cube, pls_spatial.inputs.cube),
         (spectral_block.outputs.cube, pls_spectral.inputs.cube),
-        (scale.outputs.cube, pls_stacked.inputs.cube),
+        (standardize.outputs.cube, pls_stacked.inputs.cube),
     )
     for pls in (pls_spatial, pls_spectral, pls_stacked):
         pipe.connect(
@@ -376,7 +372,7 @@ def build_unet_ensemble_maps(unet_weights: str | None) -> None:
 def _spectral_pls_chain(
     pipe: CuvisPipeline, upstream, num_channels: int, fit: bool, frame
 ) -> PLSRegression:
-    snv = SNVCorrection(name="snv")
+    snv = Standardize(name="snv", axis="spectrum", ddof=0)
     sg = SavitzkyGolayInterp(
         name="sg", num_channels=num_channels, window_length=7, polyorder=2, deriv=2
     )
@@ -475,7 +471,9 @@ def _model_head(pipe: CuvisPipeline, frame: CourseFrame, model, tag: str) -> Spa
 def build_spectral_models() -> None:
     pipe = CuvisPipeline("spectral_models")
     frame = CourseFrame(name="frame")
-    standardize = GlobalScalarStandardizer(name="standardize", ddof=0, exclude_folds=[1])
+    standardize = Standardize(
+        name="standardize", axis="global", ddof=0, eps=1e-6, exclude_folds=[1]
+    )
     pca = DatasetPCA(
         name="pca", input_channels=MEAN_SPECTRA_CHANNELS, n_components=3, exclude_folds=[1]
     )
