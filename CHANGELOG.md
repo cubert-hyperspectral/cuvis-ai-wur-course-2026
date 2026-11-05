@@ -3,7 +3,7 @@
 ## [Unreleased]
 
 ### Changed
-- `pork_pls_fusion` centres and scales with one `Standardize(axis="channel")` node instead of `MeanCenter` followed by `UnitVarianceScaling`; `pls_mean_spectra_fit` and `pls_pixel_map` use `Standardize(axis="spectrum", ddof=0)` in place of `SNVCorrection`; `spectral_models` uses `Standardize(axis="global", ddof=0, eps=1e-6, exclude_folds=[1])` in place of the plugin's own `GlobalScalarStandardizer`, now removed with its tests.
+- `pork_pls_fusion` centres and scales with one `Standardize(axis="channel")` node instead of `MeanCenter` followed by `UnitVarianceScaling`; `pls_mean_spectra_fit` and `pls_pixel_map` use `Standardize(axis="spectrum", ddof=0)` in place of `SNVCorrection`; `spectral_models` uses `Standardize(axis="global", ddof=0, eps=1e-6, exclude_folds=[1])` in place of the plugin's own `GlobalScalarStandardizer`, now removed with its tests. The SNV replacement moves from the old node's unbiased per-pixel standard deviation to `ddof=0`'s population one; the PLS rows are unaffected since the regression coefficient absorbs the constant per-pixel rescale.
 
 ### Added
 - Repository scaffold: plugin package, manifest, tests, notebooks folder.
