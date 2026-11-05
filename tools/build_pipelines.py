@@ -28,7 +28,11 @@ from pathlib import Path
 import numpy as np
 import torch
 import yaml
-from cuvis_ai.node.channel_selector import FixedWavelengthSelector
+from cuvis_ai.node.channel_selector import (
+    CIETristimulusRGBSelector,
+    CIRSelector,
+    FixedWavelengthSelector,
+)
 from cuvis_ai.node.deciders.binary_decider import ScoreThreshold
 from cuvis_ai.node.metrics import DistinctLabelCount, ExplainedVarianceMetric
 from cuvis_ai.node.numpy_file import NpyReader
@@ -36,7 +40,7 @@ from cuvis_ai.node.pretreatments.logarithm import Logarithm
 from cuvis_ai.node.pretreatments.standardize import Standardize
 from cuvis_ai.node.spectral_angle_mapper import SpectralAngleMapper
 from cuvis_ai.node.spectral_extractor import SignaturesToReferences, SpectralSignatureExtractor
-from cuvis_ai.node.video import VideoFrameNode
+from cuvis_ai.node.video import ToVideoNode, VideoFrameNode
 from cuvis_ai_core.pipeline.factory import PipelineBuilder
 from cuvis_ai_core.pipeline.pipeline import CuvisPipeline
 from cuvis_ai_core.training.config import PipelineMetadata
@@ -56,6 +60,7 @@ from cuvis_ai_wur_course.node.models import SpectrumRegressor
 from cuvis_ai_wur_course.node.pca import DatasetPCA
 from cuvis_ai_wur_course.node.pretreatment import SavitzkyGolayInterp, SpectralBinning
 from cuvis_ai_wur_course.node.regression import PLSRegression
+from cuvis_ai_wur_course.node.render import BandSweep
 from cuvis_ai_wur_course.node.source import CourseFrame
 from cuvis_ai_wur_course.node.unet import UNetChemicalMapEnsemble
 
@@ -244,6 +249,57 @@ def build_yolo_rgb() -> None:
         "An RGB frame through the ultralytics nodes with the course's yolov8n weights at imgsz 640 "
         "(the detector node loads any ultralytics weight file).",
         ["course", "yolo", "detection"],
+    )
+
+
+def build_kiwi_video() -> None:
+    """The kiwi cube as three false-colour stills and a sweep through its bands, four videos."""
+    pipe = CuvisPipeline("kiwi_video")
+    frame = CourseFrame(name="frame")
+    pseudo_rgb = FixedWavelengthSelector(
+        name="pseudo_rgb", target_wavelengths=PSEUDO_RGB_NM, norm_mode="per_frame"
+    )
+    true_rgb = CIETristimulusRGBSelector(name="true_rgb", norm_mode="per_frame")
+    cir = CIRSelector(name="cir", norm_mode="per_frame")
+    band_sweep = BandSweep(name="band_sweep")
+    stills = {
+        pseudo_rgb: ("pseudo_rgb", "pseudo-RGB 575 / 535 / 445 nm, the course rendering"),
+        true_rgb: ("true_rgb", "true colour, CIE 1931 tristimulus under D65"),
+        cir: ("cir", "colour infrared 860 / 670 / 560 nm"),
+    }
+    for selector in stills:
+        pipe.connect(
+            (frame.outputs.cube, selector.inputs.cube),
+            (frame.outputs.wavelengths, selector.inputs.wavelengths),
+        )
+    pipe.connect(
+        (frame.outputs.cube, band_sweep.inputs.cube),
+        (frame.outputs.wavelengths, band_sweep.inputs.wavelengths),
+    )
+    for selector, (stem, title) in stills.items():
+        # one frame at 0.5 fps holds the still for two seconds
+        video = ToVideoNode(
+            name=f"{stem}_video",
+            output_video_path=f"outputs/kiwi_{stem}.mp4",
+            frame_rate=0.5,
+            overlay_title=title,
+        )
+        pipe.connect((selector.outputs.rgb_image, video.inputs.rgb_image))
+    sweep_video = ToVideoNode(
+        name="band_sweep_video",
+        output_video_path="outputs/kiwi_band_sweep.mp4",
+        frame_rate=24.0,
+        overlay_title="one band per frame, 399 to 1002 nm",
+    )
+    pipe.connect((band_sweep.outputs.rgb_image, sweep_video.inputs.rgb_image))
+    _emit(
+        pipe,
+        "01_pretrained_ai/kiwi_video.yaml",
+        BASE_PLUGINS,
+        "kiwi_video",
+        "The kiwi cube as the course's pseudo-RGB, true colour and colour infrared stills and as "
+        "a sweep through its 224 bands, written as four videos under outputs/.",
+        ["course", "video", "false-colour"],
     )
 
 
@@ -557,6 +613,7 @@ def main() -> None:
     build_spectral_models()
     build_spectrum_training("mlp")
     build_spectrum_training("resnet1d")
+    build_kiwi_video()
     if args.skip_models:
         print("skipped: kiwi_sam3_spectral_match, yolo_rgb, resnet18_features, unet_ensemble_maps")
         return

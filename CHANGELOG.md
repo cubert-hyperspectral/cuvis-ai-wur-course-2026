@@ -21,6 +21,7 @@
 - `prepare-course-data kiwi-demo --spectrum-csv` writes the kiwi reference spectrum for the spectral-match filter.
 - The three teaching notebooks under `notebooks/` (`01_pretrained_ai`, `02_unet_chemical_maps`, `03_spectral_vs_spatial`) with `utils.py` for plotting and the reproduction tables, baked on the synthetic stand-in.
 - `RegressionMetrics.compute()` returns the pooled RMSE, R2 and MAE as floats.
+- `BandSweep` renders one labelled grayscale frame per band, and the pipeline `kiwi_video` writes the kiwi cube as the course's pseudo-RGB, true colour and colour infrared stills and as a sweep through its 224 bands (four videos under `outputs/`; `tools/build_pipelines.py` builds the YAML).
 
 ### Changed
 - `CourseFrame` hands the wavelengths on as np.int32 `[C]`, like the builtin source node.

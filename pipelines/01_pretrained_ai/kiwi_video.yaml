@@ -1,0 +1,125 @@
+metadata:
+  name: kiwi_video
+  description: The kiwi cube as the course's pseudo-RGB, true colour and colour infrared
+    stills and as a sweep through its 224 bands, written as four videos under outputs/.
+  created: ''
+  tags:
+  - course
+  - video
+  - false-colour
+  author: Cubert GmbH
+  cuvis_ai_version: 0.14.3
+plugins:
+- cuvis_ai_builtin
+- cuvis_ai_wur_course
+nodes:
+- name: frame
+  class_name: cuvis_ai_wur_course.node.source.CourseFrame
+  hparams:
+    name: null
+- name: pseudo_rgb
+  class_name: cuvis_ai.node.channel_selector.FixedWavelengthSelector
+  hparams:
+    target_wavelengths:
+    - 575.0
+    - 535.0
+    - 445.0
+    normalize_output: true
+    norm_mode: per_frame
+    apply_gamma: true
+    freeze_running_bounds_after_frames: 20
+    running_warmup_frames: 10
+- name: true_rgb
+  class_name: cuvis_ai.node.channel_selector.CIETristimulusRGBSelector
+  hparams:
+    illuminant: D65
+    norm_mode: per_frame
+    apply_gamma: true
+    freeze_running_bounds_after_frames: 20
+    running_warmup_frames: 10
+    normalize_output: true
+- name: cir
+  class_name: cuvis_ai.node.channel_selector.CIRSelector
+  hparams:
+    nir_nm: 860.0
+    red_nm: 670.0
+    green_nm: 560.0
+    norm_mode: per_frame
+    apply_gamma: true
+    freeze_running_bounds_after_frames: 20
+    running_warmup_frames: 10
+    normalize_output: true
+- name: band_sweep
+  class_name: cuvis_ai_wur_course.node.render.BandSweep
+  hparams:
+    step: 1
+    low: 0.005
+    high: 0.995
+    label: true
+    label_scale: 3
+    eps: 1.0e-06
+- name: pseudo_rgb_video
+  class_name: cuvis_ai.node.video.ToVideoNode
+  hparams:
+    output_video_path: outputs/kiwi_pseudo_rgb.mp4
+    frame_rate: 0.5
+    frame_rotation: null
+    video_codec: libx264
+    bitrate: 12M
+    overlay_title: pseudo-RGB 575 / 535 / 445 nm, the course rendering
+    write_mode: full
+- name: true_rgb_video
+  class_name: cuvis_ai.node.video.ToVideoNode
+  hparams:
+    output_video_path: outputs/kiwi_true_rgb.mp4
+    frame_rate: 0.5
+    frame_rotation: null
+    video_codec: libx264
+    bitrate: 12M
+    overlay_title: true colour, CIE 1931 tristimulus under D65
+    write_mode: full
+- name: cir_video
+  class_name: cuvis_ai.node.video.ToVideoNode
+  hparams:
+    output_video_path: outputs/kiwi_cir.mp4
+    frame_rate: 0.5
+    frame_rotation: null
+    video_codec: libx264
+    bitrate: 12M
+    overlay_title: colour infrared 860 / 670 / 560 nm
+    write_mode: full
+- name: band_sweep_video
+  class_name: cuvis_ai.node.video.ToVideoNode
+  hparams:
+    output_video_path: outputs/kiwi_band_sweep.mp4
+    frame_rate: 24.0
+    frame_rotation: null
+    video_codec: libx264
+    bitrate: 12M
+    overlay_title: one band per frame, 399 to 1002 nm
+    write_mode: full
+connections:
+- source: frame.outputs.cube
+  target: pseudo_rgb.inputs.cube
+- source: frame.outputs.wavelengths
+  target: pseudo_rgb.inputs.wavelengths
+- source: frame.outputs.cube
+  target: true_rgb.inputs.cube
+- source: frame.outputs.wavelengths
+  target: true_rgb.inputs.wavelengths
+- source: frame.outputs.cube
+  target: cir.inputs.cube
+- source: frame.outputs.wavelengths
+  target: cir.inputs.wavelengths
+- source: frame.outputs.cube
+  target: band_sweep.inputs.cube
+- source: frame.outputs.wavelengths
+  target: band_sweep.inputs.wavelengths
+- source: pseudo_rgb.outputs.rgb_image
+  target: pseudo_rgb_video.inputs.rgb_image
+- source: true_rgb.outputs.rgb_image
+  target: true_rgb_video.inputs.rgb_image
+- source: cir.outputs.rgb_image
+  target: cir_video.inputs.rgb_image
+- source: band_sweep.outputs.rgb_image
+  target: band_sweep_video.inputs.rgb_image

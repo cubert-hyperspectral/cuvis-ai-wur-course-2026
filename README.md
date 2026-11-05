@@ -44,7 +44,7 @@ training run with the study's losses, and the stacking fusion of notebook 01.
 ```
 cuvis_ai_wur_course/      the plugin: node/ (one module per family), data/ (the data module),
                           prepare_data.py (the CLI), upstream/ (vendored course and study code)
-plugins/                  the manifest cuvis_ai_wur_course.yaml (22 nodes and the data module)
+plugins/                  the manifest cuvis_ai_wur_course.yaml (23 nodes and the data module)
 pipelines/                one folder per notebook: pipeline YAMLs with rendered PNGs
 trainruns/                three statistical fits and two gradient runs
 notebooks/                the three notebooks and utils.py (plotting and tables only)
