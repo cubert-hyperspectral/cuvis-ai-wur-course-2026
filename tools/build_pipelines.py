@@ -46,7 +46,7 @@ from cuvis_ai_core.pipeline.pipeline import CuvisPipeline
 from cuvis_ai_core.training.config import PipelineMetadata
 
 from cuvis_ai_wur_course.node.features import ResNet18Features
-from cuvis_ai_wur_course.node.fusion import ChannelSlice, PredictionMean, SpatialMean
+from cuvis_ai_wur_course.node.fusion import ChannelSlice, PredictionMean
 from cuvis_ai_wur_course.node.kiwi import LabelBBoxFilter, LabelCropPad, LabelKeep
 from cuvis_ai_wur_course.node.losses import RegressionMSELoss
 from cuvis_ai_wur_course.node.maps import (
@@ -163,13 +163,39 @@ def _emit(
 # ----------------------------------------------------------------------------
 
 
-def build_kiwi_sam3_spectral_match() -> None:
-    pipe = CuvisPipeline("kiwi_sam3_spectral_match")
+def build_kiwi_segment() -> None:
+    """Stage 1 of the kiwi lesson: the cube to pseudo-RGB, SAM3 segments everything."""
     from cuvis_ai_sam3.node import SAM3SegmentEverything
 
-    frame = CourseFrame(name="frame")
+    pipe = CuvisPipeline("kiwi_segment")
+    frame = CourseFrame(name="frame", keys=("wavelengths",))
     pseudo_rgb = FixedWavelengthSelector(name="pseudo_rgb", target_wavelengths=PSEUDO_RGB_NM)
     sam3 = SAM3SegmentEverything(name="sam3")
+    pipe.connect(
+        (frame.outputs.cube, pseudo_rgb.inputs.cube),
+        (frame.outputs.wavelengths, pseudo_rgb.inputs.wavelengths),
+        (pseudo_rgb.outputs.rgb_image, sam3.inputs.rgb_image),
+    )
+    _emit(
+        pipe,
+        "01_pretrained_ai/kiwi_segment.yaml",
+        [*BASE_PLUGINS, "sam3"],
+        "kiwi_segment",
+        "Kiwi cube to the course's pseudo-RGB (575, 535, 445 nm) and SAM3 segment-everything: "
+        "one label mask and the object ids, the input of kiwi_filters.",
+        ["course", "sam3", "segmentation"],
+    )
+
+
+def build_kiwi_filters() -> None:
+    """Stage 2: the course's size filter and spectral-angle filter, side by side.
+
+    Both filters read SAM3's original mask. The batch carries the hand-off from
+    kiwi_segment: ``cube`` and ``wavelengths`` from its frame, ``mask`` and
+    ``object_ids`` from SAM3; every input port of those names in this graph is meant
+    to receive them (the pipeline feeds batch keys into ports by name).
+    """
+    pipe = CuvisPipeline("kiwi_filters")
     size_filter = LabelBBoxFilter(
         name="size_filter", min_height=50, max_height=120, min_width=150, max_width=210
     )
@@ -183,46 +209,54 @@ def build_kiwi_sam3_spectral_match() -> None:
     kiwi_decision = ScoreThreshold(name="kiwi_decision", threshold=KIWI_ANGLE_CUTOFF, keep="below")
     spectral_filter = LabelKeep(name="spectral_filter")
     count_spectral = DistinctLabelCount(name="count_spectral_filter")
-    kiwi_crop = LabelCropPad(name="kiwi_crop", canvas_size=256, label_selection="first")
-    crop_rgb = FixedWavelengthSelector(name="crop_rgb", target_wavelengths=PSEUDO_RGB_NM)
-    features = ResNet18Features(name="features", weights="imagenet")
-
     pipe.connect(
-        (frame.outputs.cube, pseudo_rgb.inputs.cube),
-        (frame.outputs.wavelengths, pseudo_rgb.inputs.wavelengths),
-        (pseudo_rgb.outputs.rgb_image, sam3.inputs.rgb_image),
-        # Branch A: the course's size filter (height 50 to 120, width 150 to 210 px).
-        (sam3.outputs.mask, size_filter.inputs.mask),
+        # Branch A: the course's size filter (height 50 to 120, width 150 to 210 px) on the
+        # batch mask.
         (size_filter.outputs.mask, count_size.inputs.mask),
-        # Branch B: the course's spectral-angle filter against the saved kiwi spectrum.
-        (frame.outputs.cube, object_spectra.inputs.cube),
-        (sam3.outputs.mask, object_spectra.inputs.mask),
-        (sam3.outputs.object_ids, object_spectra.inputs.object_ids),
-        (frame.outputs.wavelengths, object_spectra.inputs.wavelengths),
+        # Branch B: the course's spectral-angle filter against the saved kiwi spectrum; the
+        # spectra and the keep step read cube, wavelengths, mask and object_ids from the batch.
         (object_spectra.outputs.signatures, object_references.inputs.signatures),
         (object_references.outputs.spectral_signature, kiwi_angle.inputs.cube),
         (kiwi_reference.outputs.data, kiwi_angle.inputs.spectral_signature),
         (kiwi_angle.outputs.best_scores, kiwi_decision.inputs.scores),
-        (sam3.outputs.mask, spectral_filter.inputs.mask),
-        (sam3.outputs.object_ids, spectral_filter.inputs.object_ids),
         (kiwi_decision.outputs.decisions, spectral_filter.inputs.decisions),
         (spectral_filter.outputs.mask, count_spectral.inputs.mask),
-        # One kiwi out of branch B, padded to 256 x 256, rendered and embedded.
-        (frame.outputs.cube, kiwi_crop.inputs.cube),
-        (spectral_filter.outputs.mask, kiwi_crop.inputs.mask),
+    )
+    _emit(
+        pipe,
+        "01_pretrained_ai/kiwi_filters.yaml",
+        BASE_PLUGINS,
+        "kiwi_filters",
+        "The course's two kiwi filters on SAM3's mask, side by side: bounding-box size, and "
+        "spectral angle against the saved kiwi spectrum below 0.035 rad; each counts what it "
+        "keeps. Batch: cube, wavelengths, mask, object_ids from kiwi_segment.",
+        ["course", "spectral-match", "filter"],
+    )
+
+
+def build_kiwi_crop_features() -> None:
+    """Stage 3: one kiwi kept by the spectral filter, padded to 256 px, rendered and embedded.
+
+    The batch carries ``cube`` and ``wavelengths`` from kiwi_segment's frame and the
+    spectral filter's ``mask`` from kiwi_filters.
+    """
+    pipe = CuvisPipeline("kiwi_crop_features")
+    kiwi_crop = LabelCropPad(name="kiwi_crop", canvas_size=256, label_selection="first")
+    crop_rgb = FixedWavelengthSelector(name="crop_rgb", target_wavelengths=PSEUDO_RGB_NM)
+    features = ResNet18Features(name="features", weights="imagenet")
+    pipe.connect(
         (kiwi_crop.outputs.crop, crop_rgb.inputs.cube),
-        (frame.outputs.wavelengths, crop_rgb.inputs.wavelengths),
         (crop_rgb.outputs.rgb_image, features.inputs.image),
     )
     _emit(
         pipe,
-        "01_pretrained_ai/kiwi_sam3_spectral_match.yaml",
-        [*BASE_PLUGINS, "sam3"],
-        "kiwi_sam3_spectral_match",
-        "Kiwi cube to pseudo-RGB, SAM3 segment-everything, the course's size filter and "
-        "spectral-angle filter side by side, one kiwi cropped to 256 px and embedded with "
-        "ResNet-18.",
-        ["course", "sam3", "spectral-match", "resnet18"],
+        "01_pretrained_ai/kiwi_crop_features.yaml",
+        BASE_PLUGINS,
+        "kiwi_crop_features",
+        "The first kiwi of the spectral filter's mask cropped and padded to 256 x 256, rendered "
+        "as pseudo-RGB and embedded with ImageNet ResNet-18. Batch: cube and wavelengths from "
+        "kiwi_segment, mask from kiwi_filters.",
+        ["course", "resnet18", "features"],
     )
 
 
@@ -255,7 +289,7 @@ def build_yolo_rgb() -> None:
 def build_kiwi_video() -> None:
     """The kiwi cube as three false-colour stills and a sweep through its bands, four videos."""
     pipe = CuvisPipeline("kiwi_video")
-    frame = CourseFrame(name="frame")
+    frame = CourseFrame(name="frame", keys=("wavelengths",))
     pseudo_rgb = FixedWavelengthSelector(
         name="pseudo_rgb", target_wavelengths=PSEUDO_RGB_NM, norm_mode="per_frame"
     )
@@ -318,22 +352,18 @@ def build_resnet18_features() -> None:
     )
 
 
-def _regression_head(
-    pipe: CuvisPipeline, frame: CourseFrame, pls: PLSRegression, tag: str
-) -> SpatialMean:
-    mean = SpatialMean(name=f"mean_{tag}")
+def _regression_head(pipe: CuvisPipeline, frame: CourseFrame, pls: PLSRegression, tag: str) -> None:
+    """Pooled regression metrics on one PLS prediction map (averaged per sample by the node)."""
     metrics = RegressionMetrics(name=f"metrics_{tag}")
     pipe.connect(
-        (pls.outputs.prediction, mean.inputs.prediction),
-        (mean.outputs.prediction, metrics.inputs.prediction),
+        (pls.outputs.prediction, metrics.inputs.prediction),
         (frame.outputs.target, metrics.inputs.target),
     )
-    return mean
 
 
 def build_pork_pls_fusion() -> None:
     pipe = CuvisPipeline("pork_pls_fusion")
-    frame = CourseFrame(name="frame")
+    frame = CourseFrame(name="frame", keys=("wavelengths", "target", "fold"))
     standardize = Standardize(name="standardize", axis="channel")
     spatial_block = ChannelSlice(name="spatial_block", start=0, stop=PORK_SPATIAL)
     spectral_block = ChannelSlice(
@@ -366,14 +396,14 @@ def build_pork_pls_fusion() -> None:
             (frame.outputs.target, pls.inputs.target),
             (frame.outputs.fold, pls.inputs.fold),
         )
-    mean_spatial = _regression_head(pipe, frame, pls_spatial, "spatial")
-    mean_spectral = _regression_head(pipe, frame, pls_spectral, "spectral")
+    _regression_head(pipe, frame, pls_spatial, "spatial")
+    _regression_head(pipe, frame, pls_spectral, "spectral")
     _regression_head(pipe, frame, pls_stacked, "stacked")
     fusion = PredictionMean(name="fusion")
     metrics_fusion = RegressionMetrics(name="metrics_fusion")
     pipe.connect(
-        (mean_spatial.outputs.prediction, fusion.inputs.prediction),
-        (mean_spectral.outputs.prediction, fusion.inputs.prediction),
+        (pls_spatial.outputs.prediction, fusion.inputs.prediction),
+        (pls_spectral.outputs.prediction, fusion.inputs.prediction),
         (fusion.outputs.prediction, metrics_fusion.inputs.prediction),
         (frame.outputs.target, metrics_fusion.inputs.target),
     )
@@ -396,7 +426,7 @@ def build_pork_pls_fusion() -> None:
 
 def build_unet_ensemble_maps(unet_weights: str | None) -> None:
     pipe = CuvisPipeline("unet_ensemble_maps")
-    frame = CourseFrame(name="frame")
+    frame = CourseFrame(name="frame", keys=("mask", "group", "quant_scale", "quant_bias"))
     dequantize = Dequantize(name="dequantize")
     unet = UNetChemicalMapEnsemble(name="unet", n_members=5, weights=unet_weights)
     stats = ChemicalMapStatistics(name="stats", mask_scale=1)
@@ -453,7 +483,7 @@ def _spectral_pls_chain(
 
 def build_pls_mean_spectra_fit() -> None:
     pipe = CuvisPipeline("pls_mean_spectra_fit")
-    frame = CourseFrame(name="frame")
+    frame = CourseFrame(name="frame", keys=("wavelengths", "target", "fold"))
     binning = SpectralBinning(name="binning", input_channels=MEAN_SPECTRA_CHANNELS, bin_size=2)
     pipe.connect(
         (frame.outputs.cube, binning.inputs.cube),
@@ -475,7 +505,8 @@ def build_pls_mean_spectra_fit() -> None:
 
 def build_pls_pixel_map() -> None:
     pipe = CuvisPipeline("pls_pixel_map")
-    frame = CourseFrame(name="frame")
+    # group is not wired here but notebook 02 reads it off the frame to name each slice's belly.
+    frame = CourseFrame(name="frame", keys=("mask", "group", "quant_scale", "quant_bias"))
     dequantize = Dequantize(name="dequantize")
     crop = CenterCrop(name="crop", crop_height=PLS_MAP_CROP[0], crop_width=PLS_MAP_CROP[1])
     absorbance = Logarithm(name="absorbance", mode="log10", negate=True, eps=1e-6)
@@ -512,21 +543,19 @@ def build_pls_pixel_map() -> None:
 # ----------------------------------------------------------------------------
 
 
-def _model_head(pipe: CuvisPipeline, frame: CourseFrame, model, tag: str) -> SpatialMean:
-    mean = SpatialMean(name=f"mean_{tag}")
+def _model_head(pipe: CuvisPipeline, frame: CourseFrame, model, tag: str) -> None:
+    """One model on the frame's cube with pooled regression metrics on its prediction map."""
     metrics = RegressionMetrics(name=f"metrics_{tag}")
     pipe.connect(
         (frame.outputs.cube, model.inputs.cube),
-        (model.outputs.prediction, mean.inputs.prediction),
-        (mean.outputs.prediction, metrics.inputs.prediction),
+        (model.outputs.prediction, metrics.inputs.prediction),
         (frame.outputs.target, metrics.inputs.target),
     )
-    return mean
 
 
 def build_spectral_models() -> None:
     pipe = CuvisPipeline("spectral_models")
-    frame = CourseFrame(name="frame")
+    frame = CourseFrame(name="frame", keys=("target", "fold"))
     standardize = Standardize(
         name="standardize", axis="global", ddof=0, eps=1e-6, exclude_folds=[1]
     )
@@ -577,17 +606,15 @@ def build_spectral_models() -> None:
 def build_spectrum_training(arch: str) -> None:
     """A trainable copy of one course model with its loss and metrics for the gradient trainrun."""
     pipe = CuvisPipeline(f"{arch}_train")
-    frame = CourseFrame(name="frame")
+    frame = CourseFrame(name="frame", keys=("target",))
     model = SpectrumRegressor(name=arch, arch=arch, input_channels=MEAN_SPECTRA_CHANNELS)
-    mean = SpatialMean(name="mean")
     loss = RegressionMSELoss(name="loss")
     metrics = RegressionMetrics(name="metrics")
     pipe.connect(
         (frame.outputs.cube, model.inputs.cube),
-        (model.outputs.prediction, mean.inputs.prediction),
-        (mean.outputs.prediction, loss.inputs.prediction),
+        (model.outputs.prediction, loss.inputs.prediction),
         (frame.outputs.target, loss.inputs.target),
-        (mean.outputs.prediction, metrics.inputs.prediction),
+        (model.outputs.prediction, metrics.inputs.prediction),
         (frame.outputs.target, metrics.inputs.target),
     )
     _emit(
@@ -615,7 +642,10 @@ def main() -> None:
     build_spectrum_training("resnet1d")
     build_kiwi_video()
     if args.skip_models:
-        print("skipped: kiwi_sam3_spectral_match, yolo_rgb, resnet18_features, unet_ensemble_maps")
+        print(
+            "skipped: kiwi_segment, kiwi_filters, kiwi_crop_features, yolo_rgb, "
+            "resnet18_features, unet_ensemble_maps"
+        )
         return
     build_resnet18_features()
     try:
@@ -626,7 +656,9 @@ def main() -> None:
         )
         build_unet_ensemble_maps(None)
     build_yolo_rgb()
-    build_kiwi_sam3_spectral_match()
+    build_kiwi_segment()
+    build_kiwi_filters()
+    build_kiwi_crop_features()
 
 
 if __name__ == "__main__":

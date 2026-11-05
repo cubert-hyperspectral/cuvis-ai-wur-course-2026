@@ -123,7 +123,7 @@ course's, and the plugin's YOLO26 labels are reported next to them.
 | `node/metrics.py`, `node/losses.py` | `RegressionMetrics`, `RegressionMSELoss` |
 | `node/pca.py` | `DatasetPCA` |
 | `node/pretreatment.py` | `SpectralBinning`, `SavitzkyGolayInterp` |
-| `node/fusion.py` | `ChannelSlice`, `PredictionMean`, `SpatialMean` |
+| `node/fusion.py` | `ChannelSlice`, `PredictionMean` |
 | `node/kiwi.py`, `node/features.py` | `LabelBBoxFilter`, `LabelCropPad`, `LabelKeep`, `ResNet18Features` |
 | `node/models.py` | `SpectrumRegressor` (the course's MLP and 1D ResNet) |
 | `node/unet.py`, `node/maps.py` | `UNetChemicalMapEnsemble`, `Dequantize`, `CenterCrop`, `MaskToMapResolution`, `GroupWeightedMean`, `ChemicalMapStatistics` |

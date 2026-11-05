@@ -24,18 +24,23 @@ class _RegressionSource(Node):
 
     INPUT_SPECS: dict[str, PortSpec] = {}
     OUTPUT_SPECS = {
-        "prediction": PortSpec(dtype=torch.float32, shape=(-1, -1)),
+        "prediction": PortSpec(dtype=torch.float32, shape=(-1, -1, -1, -1)),
         "target": PortSpec(dtype=torch.float32, shape=(-1, -1)),
     }
 
     def forward(self, **_) -> dict[str, torch.Tensor]:
         return {
-            "prediction": torch.rand(3, 1, dtype=torch.float32),
+            "prediction": torch.rand(3, 1, 1, 1, dtype=torch.float32),
             "target": torch.rand(3, 1, dtype=torch.float32),
         }
 
 
 # ----- helpers ---------------------------------------------------------
+
+
+def _map(prediction: torch.Tensor) -> torch.Tensor:
+    """A ``[B, T]`` prediction as the 1x1 map ``[B, 1, 1, T]`` a model emits on a mean spectrum."""
+    return prediction[:, None, None, :]
 
 
 def _batches(
@@ -44,7 +49,7 @@ def _batches(
     """A handful of (prediction, target) batches with fixed shapes."""
     return [
         (
-            torch.rand(batch_size, n_targets, dtype=torch.float32),
+            torch.rand(batch_size, 1, 1, n_targets, dtype=torch.float32),
             torch.rand(batch_size, n_targets, dtype=torch.float32),
         )
         for _ in range(n_batches)
@@ -65,7 +70,7 @@ def test_golden_reference_pooled_over_several_batches() -> None:
         out = node(prediction=prediction, target=target)
     assert out is not None
 
-    all_pred = torch.cat([p for p, _ in batches]).numpy()
+    all_pred = torch.cat([p.mean(dim=(1, 2)) for p, _ in batches]).numpy()
     all_target = torch.cat([t for _, t in batches]).numpy()
 
     expected_rmse = mean_squared_error(all_target, all_pred) ** 0.5
@@ -81,12 +86,12 @@ def test_golden_reference_single_target_hand_values() -> None:
     """A tiny hand-built single-target batch matches a closed-form computation."""
     node = RegressionMetrics()
     node.reset()
-    prediction = torch.tensor([[1.0], [2.0], [3.0]])
+    prediction = _map(torch.tensor([[1.0], [2.0], [3.0]]))
     target = torch.tensor([[1.5], [2.0], [2.5]])
 
     out = node(prediction=prediction, target=target)
 
-    errors = (prediction - target).squeeze(-1)
+    errors = (prediction.mean(dim=(1, 2)) - target).squeeze(-1)
     expected_mae = errors.abs().mean().item()
     expected_rmse = (errors**2).mean().sqrt().item()
 
@@ -98,14 +103,14 @@ def test_reset_clears_pooled_state() -> None:
     """reset() drops accumulated state so a fresh pass starts from zero batches seen."""
     node = RegressionMetrics()
     node.reset()
-    node(prediction=torch.rand(4, 2), target=torch.rand(4, 2))
+    node(prediction=torch.rand(4, 1, 1, 2), target=torch.rand(4, 2))
 
     node.reset()
-    prediction = torch.rand(4, 2)
+    prediction = torch.rand(4, 1, 1, 2)
     target = torch.rand(4, 2)
     out = node(prediction=prediction, target=target)
 
-    expected_mae = (prediction - target).abs().mean().item()
+    expected_mae = (prediction.mean(dim=(1, 2)) - target).abs().mean().item()
     assert out["mae"].item() == pytest.approx(expected_mae, abs=1e-6)
 
 
@@ -115,7 +120,7 @@ def test_reset_clears_pooled_state() -> None:
 def test_port_contract() -> None:
     node = RegressionMetrics()
     node.reset()
-    prediction = torch.rand(5, 2, dtype=torch.float32)
+    prediction = torch.rand(5, 1, 1, 2, dtype=torch.float32)
     target = torch.rand(5, 2, dtype=torch.float32)
 
     out = node(prediction=prediction, target=target)
@@ -151,7 +156,7 @@ def test_reload_smoke(tmp_path) -> None:
     rebuilt_node = next(n for n in rebuilt.nodes if isinstance(n, RegressionMetrics))
     rebuilt_node.reset()
 
-    prediction = torch.rand(3, 1, dtype=torch.float32)
+    prediction = torch.rand(3, 1, 1, 1, dtype=torch.float32)
     target = torch.rand(3, 1, dtype=torch.float32)
     out = rebuilt_node(prediction=prediction, target=target)
     assert "rmse" in out and "r2" in out and "mae" in out
@@ -170,7 +175,7 @@ def test_pooled_metric_contract_exposes_live_objects_after_a_batch() -> None:
     node = RegressionMetrics()
     assert node.POOLED_METRIC_NAMES == frozenset({"rmse", "r2", "mae"})
     assert node.pooled_metrics() == {}
-    node(prediction=torch.tensor([[1.0], [2.0]]), target=torch.tensor([[1.5], [2.5]]))
+    node(prediction=_map(torch.tensor([[1.0], [2.0]])), target=torch.tensor([[1.5], [2.5]]))
     pooled = node.pooled_metrics()
     assert set(pooled) == node.POOLED_METRIC_NAMES
     assert pooled["rmse"] is node.rmse_metric
@@ -182,9 +187,47 @@ def test_pooled_metric_contract_exposes_live_objects_after_a_batch() -> None:
 def test_compute_returns_pooled_floats_after_batches() -> None:
     node = RegressionMetrics()
     assert node.compute() == {}
-    node(prediction=torch.tensor([[1.0], [2.0]]), target=torch.tensor([[1.5], [2.5]]))
-    node(prediction=torch.tensor([[3.0]]), target=torch.tensor([[3.5]]))
+    node(prediction=_map(torch.tensor([[1.0], [2.0]])), target=torch.tensor([[1.5], [2.5]]))
+    node(prediction=_map(torch.tensor([[3.0]])), target=torch.tensor([[3.5]]))
     values = node.compute()
     assert set(values) == {"rmse", "r2", "mae"}
     assert values["rmse"] == pytest.approx(0.5)
     assert values["mae"] == pytest.approx(0.5)
+
+
+# ----- prediction maps ---------------------------------------------------
+
+
+def test_prediction_port_takes_a_map() -> None:
+    assert RegressionMetrics.INPUT_SPECS["prediction"].shape == (-1, -1, -1, -1)
+
+
+def test_a_one_by_one_map_gives_the_metrics_of_its_squeezed_prediction_exactly() -> None:
+    """The mean-spectra case: a 1x1 map scores exactly like the [B, T] it holds."""
+    torch.manual_seed(2)
+    prediction = torch.rand(6, 2)
+    target = torch.rand(6, 2)
+    out = RegressionMetrics()(prediction=_map(prediction), target=target)
+
+    reference = RegressionMetrics()
+    reference.rmse_metric.update(prediction, target)
+    reference.r2_metric.update(prediction, target)
+    reference.mae_metric.update(prediction, target)
+    assert torch.equal(out["rmse"], reference.rmse_metric.compute())
+    assert torch.equal(out["r2"], reference.r2_metric.compute())
+    assert torch.equal(out["mae"], reference.mae_metric.compute())
+
+
+def test_a_map_is_averaged_per_sample_before_the_comparison() -> None:
+    torch.manual_seed(3)
+    prediction_map = torch.rand(4, 3, 5, 2)
+    target = torch.rand(4, 2)
+    out = RegressionMetrics()(prediction=prediction_map, target=target)
+
+    per_sample = prediction_map.mean(dim=(1, 2)).numpy()
+    expected_rmse = mean_squared_error(target.numpy(), per_sample) ** 0.5
+    assert out["rmse"].item() == pytest.approx(expected_rmse, abs=1e-6)
+    assert out["r2"].item() == pytest.approx(r2_score(target.numpy(), per_sample), abs=1e-5)
+    assert out["mae"].item() == pytest.approx(
+        mean_absolute_error(target.numpy(), per_sample), abs=1e-6
+    )

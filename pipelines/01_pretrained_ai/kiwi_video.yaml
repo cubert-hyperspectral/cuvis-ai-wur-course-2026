@@ -8,7 +8,7 @@ metadata:
   - video
   - false-colour
   author: Cubert GmbH
-  cuvis_ai_version: 0.14.3
+  cuvis_ai_version: 0.14.4
 plugins:
 - cuvis_ai_builtin
 - cuvis_ai_wur_course
@@ -16,7 +16,8 @@ nodes:
 - name: frame
   class_name: cuvis_ai_wur_course.node.source.CourseFrame
   hparams:
-    name: null
+    keys:
+    - wavelengths
 - name: pseudo_rgb
   class_name: cuvis_ai.node.channel_selector.FixedWavelengthSelector
   hparams:

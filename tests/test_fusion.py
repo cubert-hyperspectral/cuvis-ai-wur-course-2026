@@ -1,4 +1,4 @@
-"""Tests for cuvis_ai_wur_course.node.fusion: ChannelSlice, PredictionMean, SpatialMean."""
+"""Tests for cuvis_ai_wur_course.node.fusion: ChannelSlice and PredictionMean."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from cuvis_ai_core.pipeline.factory import PipelineBuilder
 from cuvis_ai_core.pipeline.pipeline import CuvisPipeline
 from cuvis_ai_schemas.pipeline import PortSpec
 
-from cuvis_ai_wur_course.node.fusion import ChannelSlice, PredictionMean, SpatialMean
+from cuvis_ai_wur_course.node.fusion import ChannelSlice, PredictionMean
 
 pytestmark = pytest.mark.unit
 
@@ -50,11 +50,13 @@ class _CubeSink(Node):
 
 
 class _PredictionSource(Node):
-    """Minimal source node: emits a fixed [B, T] prediction."""
+    """Minimal source node: emits a fixed 1x1 prediction map [B, 1, 1, T]."""
 
     INPUT_SPECS: dict[str, PortSpec] = {}
     OUTPUT_SPECS = {
-        "prediction": PortSpec(dtype=torch.float32, shape=(-1, -1), description="prediction"),
+        "prediction": PortSpec(
+            dtype=torch.float32, shape=(-1, -1, -1, -1), description="prediction"
+        ),
     }
 
     def __init__(self, value: float, batch: int = 2, n_targets: int = 1, **kwargs) -> None:
@@ -65,16 +67,20 @@ class _PredictionSource(Node):
 
     def forward(self, **_):
         return {
-            "prediction": torch.full((self.batch, self.n_targets), self.value, dtype=torch.float32)
+            "prediction": torch.full(
+                (self.batch, 1, 1, self.n_targets), self.value, dtype=torch.float32
+            )
         }
 
 
 class _PredictionSink(Node):
     INPUT_SPECS = {
-        "prediction": PortSpec(dtype=torch.float32, shape=(-1, -1), description="prediction"),
+        "prediction": PortSpec(
+            dtype=torch.float32, shape=(-1, -1, -1, -1), description="prediction"
+        ),
     }
     OUTPUT_SPECS = {
-        "seen": PortSpec(dtype=torch.float32, shape=(-1, -1), description="seen"),
+        "seen": PortSpec(dtype=torch.float32, shape=(-1, -1, -1, -1), description="seen"),
     }
 
     def forward(self, prediction, **_):
@@ -173,41 +179,41 @@ def test_channel_slice_export_smoke():
 
 def test_prediction_mean_two_producers():
     node = PredictionMean()
-    a = torch.tensor([[1.0, 2.0], [3.0, 4.0]])
-    b = torch.tensor([[3.0, 4.0], [5.0, 6.0]])
+    a = torch.tensor([[1.0, 2.0], [3.0, 4.0]])[:, None, None, :]
+    b = torch.tensor([[3.0, 4.0], [5.0, 6.0]])[:, None, None, :]
 
     out = node(prediction=[a, b])["prediction"]
-    expected = torch.tensor([[2.0, 3.0], [4.0, 5.0]])
+    expected = torch.tensor([[2.0, 3.0], [4.0, 5.0]])[:, None, None, :]
     assert torch.allclose(out, expected)
 
 
 def test_prediction_mean_three_producers():
     node = PredictionMean()
-    a = torch.full((3, 1), 1.0)
-    b = torch.full((3, 1), 2.0)
-    c = torch.full((3, 1), 3.0)
+    a = torch.full((3, 1, 1, 1), 1.0)
+    b = torch.full((3, 1, 1, 1), 2.0)
+    c = torch.full((3, 1, 1, 1), 3.0)
 
     out = node(prediction=[a, b, c])["prediction"]
-    assert torch.allclose(out, torch.full((3, 1), 2.0))
+    assert torch.allclose(out, torch.full((3, 1, 1, 1), 2.0))
 
 
 def test_prediction_mean_port_contract():
     node = PredictionMean()
-    a = torch.rand(4, 2)
-    b = torch.rand(4, 2)
+    a = torch.rand(4, 3, 5, 2)
+    b = torch.rand(4, 3, 5, 2)
     out = node(prediction=[a, b])
     for port_name, spec in node.OUTPUT_SPECS.items():
         assert port_name in out
         tensor = out[port_name]
         assert isinstance(tensor, torch.Tensor)
         assert tensor.dtype == spec.dtype
-    assert out["prediction"].shape == (4, 2)
+    assert out["prediction"].shape == (4, 3, 5, 2)
 
 
 def test_prediction_mean_rejects_mismatched_shapes():
     node = PredictionMean()
-    a = torch.rand(2, 1)
-    b = torch.rand(3, 1)
+    a = torch.rand(2, 1, 1, 1)
+    b = torch.rand(3, 1, 1, 1)
     with pytest.raises(ValueError):
         node(prediction=[a, b])
 
@@ -244,78 +250,34 @@ def test_prediction_mean_export_smoke():
         def forward(self, a: torch.Tensor, b: torch.Tensor) -> torch.Tensor:
             return node(prediction=[a, b])["prediction"]
 
-    example_a = torch.rand(2, 1, dtype=torch.float32)
-    example_b = torch.rand(2, 1, dtype=torch.float32)
+    example_a = torch.rand(2, 1, 1, 1, dtype=torch.float32)
+    example_b = torch.rand(2, 1, 1, 1, dtype=torch.float32)
     program = torch.export.export(_Probe(), (example_a, example_b))
 
-    other_a = torch.rand(2, 1, dtype=torch.float32)
-    other_b = torch.rand(2, 1, dtype=torch.float32)
+    other_a = torch.rand(2, 1, 1, 1, dtype=torch.float32)
+    other_b = torch.rand(2, 1, 1, 1, dtype=torch.float32)
     traced = program.module()(other_a, other_b)
     assert torch.allclose(traced, node(prediction=[other_a, other_b])["prediction"], atol=1e-6)
 
 
-# ----- SpatialMean --------------------------------------------------------
+def test_prediction_mean_takes_and_returns_maps():
+    assert PredictionMean.INPUT_SPECS["prediction"].shape == (-1, -1, -1, -1)
+    assert PredictionMean.OUTPUT_SPECS["prediction"].shape == (-1, -1, -1, -1)
 
 
-class _MapSource(Node):
-    """Minimal source node: no inputs, emits a fixed per-pixel prediction map."""
-
-    INPUT_SPECS: dict[str, PortSpec] = {}
-    OUTPUT_SPECS = {
-        "prediction": PortSpec(dtype=torch.float32, shape=(-1, -1, -1, -1), description="map"),
-    }
-
-    def forward(self, **_):
-        return {"prediction": torch.rand(2, 3, 3, 1, dtype=torch.float32)}
+def test_prediction_mean_of_one_by_one_maps_equals_the_old_per_sample_fusion_exactly():
+    """Fusing 1x1 maps then averaging H, W gives the old fusion of [B, T] predictions."""
+    torch.manual_seed(6)
+    maps = [torch.rand(5, 1, 1, 2) for _ in range(3)]
+    fused = PredictionMean()(prediction=maps)["prediction"].mean(dim=(1, 2))
+    old = torch.stack([m.mean(dim=(1, 2)) for m in maps], dim=0).mean(dim=0)
+    assert torch.equal(fused, old)
 
 
-def test_spatial_mean_golden_reference_unmasked():
-    node = SpatialMean()
-    pred_map = torch.rand(2, 4, 4, 3, dtype=torch.float32)
-
-    out = node(prediction=pred_map)["prediction"]
-    expected = pred_map.mean(dim=(1, 2))
-    assert torch.allclose(out, expected, atol=1e-6)
-
-
-def test_spatial_mean_port_contract():
-    node = SpatialMean()
-    pred_map = torch.rand(2, 3, 3, 4, dtype=torch.float32)
-    out = node(prediction=pred_map)
-    for port_name, spec in node.OUTPUT_SPECS.items():
-        assert port_name in out
-        tensor = out[port_name]
-        assert isinstance(tensor, torch.Tensor)
-        assert tensor.dtype == spec.dtype
-    assert out["prediction"].shape == (2, 4)
-
-
-def test_spatial_mean_reload_smoke(tmp_path):
-    pipe = CuvisPipeline("spatial_mean_reload_test")
-
-    src = _MapSource(name="src")
-    node = SpatialMean(name="spatial_mean")
-    sink = _PredictionSink(name="sink")
-    pipe.connect(src.outputs.prediction, node.inputs.prediction)
-    pipe.connect(node.outputs.prediction, sink.inputs.prediction)
-
-    yaml_path = tmp_path / "spatial_mean_pipeline.yaml"
-    pipe.save_to_file(yaml_path)
-
-    rebuilt = PipelineBuilder().build_from_config(yaml_path)
-    assert rebuilt is not None
-
-
-def test_spatial_mean_export_smoke():
-    node = SpatialMean().eval()
-
-    class _Probe(torch.nn.Module):
-        def forward(self, pred_map: torch.Tensor) -> torch.Tensor:
-            return node(prediction=pred_map)["prediction"]
-
-    example = torch.rand(2, 3, 3, 2, dtype=torch.float32)
-    program = torch.export.export(_Probe(), (example,))
-
-    other = torch.rand(2, 3, 3, 2, dtype=torch.float32)
-    traced = program.module()(other)
-    assert torch.allclose(traced, node(prediction=other)["prediction"], atol=1e-6)
+def test_prediction_mean_of_maps_matches_the_per_sample_fusion_up_to_float_order():
+    """On H x W maps the order of the two means changes only the float rounding."""
+    torch.manual_seed(7)
+    maps = [torch.rand(2, 4, 3, 1) for _ in range(3)]
+    fused = PredictionMean()(prediction=maps)["prediction"].mean(dim=(1, 2))
+    old = torch.stack([m.mean(dim=(1, 2)) for m in maps], dim=0).mean(dim=0)
+    assert torch.allclose(fused, old, atol=1e-6)

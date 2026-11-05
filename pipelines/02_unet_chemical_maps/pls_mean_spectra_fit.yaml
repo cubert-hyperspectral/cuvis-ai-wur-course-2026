@@ -17,7 +17,10 @@ nodes:
 - name: frame
   class_name: cuvis_ai_wur_course.node.source.CourseFrame
   hparams:
-    name: null
+    keys:
+    - wavelengths
+    - target
+    - fold
 - name: binning
   class_name: cuvis_ai_wur_course.node.pretreatment.SpectralBinning
   hparams:
@@ -56,10 +59,6 @@ nodes:
     holdout_folds: each
     refit_on_holdout: true
     eps: 1.0e-12
-- name: mean_pls
-  class_name: cuvis_ai_wur_course.node.fusion.SpatialMean
-  hparams:
-    name: null
 - name: metrics_pls
   class_name: cuvis_ai_wur_course.node.metrics.RegressionMetrics
   hparams: {}
@@ -81,6 +80,4 @@ connections:
 - source: sg.outputs.cube
   target: pls.inputs.cube
 - source: pls.outputs.prediction
-  target: mean_pls.inputs.prediction
-- source: mean_pls.outputs.prediction
   target: metrics_pls.inputs.prediction
