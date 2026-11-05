@@ -207,7 +207,7 @@ def test_explained_variance_port_name_matches_metric_consumer() -> None:
 def test_reload_smoke(tmp_path) -> None:
     """Save the fitted node, then reload structure and weights together.
 
-    As with ``GlobalScalarStandardizer``, ``_statistically_initialized`` is not a
+    As with ``Standardize``, ``_statistically_initialized`` is not a
     persisted buffer, so the fitted mean/components/ratio buffers must come back via
     the companion weights checkpoint, not structure alone.
     """

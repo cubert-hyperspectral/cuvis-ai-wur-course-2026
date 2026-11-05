@@ -11,7 +11,7 @@ metadata:
   - resnet1d
   - pca
   author: Cubert GmbH
-  cuvis_ai_version: 0.14.3
+  cuvis_ai_version: 0.14.4
 plugins:
 - cuvis_ai_builtin
 - cuvis_ai_wur_course
@@ -21,12 +21,21 @@ nodes:
   hparams:
     name: null
 - name: standardize
-  class_name: cuvis_ai_wur_course.node.scaling.GlobalScalarStandardizer
+  class_name: cuvis_ai.node.pretreatments.standardize.Standardize
   hparams:
+    axis: global
+    with_mean: true
+    with_std: true
+    stats: fit
+    mean: null
+    std: null
     ddof: 0
     eps: 1.0e-06
+    eps_mode: floor
     exclude_folds:
     - 1
+    max_initialization_frames: null
+    layout: bhwc
 - name: pca
   class_name: cuvis_ai_wur_course.node.pca.DatasetPCA
   hparams:

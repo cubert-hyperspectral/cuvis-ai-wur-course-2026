@@ -7,7 +7,7 @@ sources and licences; CHANGELOG.md tracks the work.
 
 ## Layout
 
-- `cuvis_ai_wur_course/node/`: one module per node family (regression, metrics, losses, scaling, pca,
+- `cuvis_ai_wur_course/node/`: one module per node family (regression, metrics, losses, pca,
   pretreatment, fusion, kiwi, features, models, unet, maps, source).
 - `cuvis_ai_wur_course/data/`: the `wur_course_npz` data module; `prepare_data.py` is the
   `prepare-course-data` CLI (Click).
