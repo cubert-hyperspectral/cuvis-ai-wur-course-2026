@@ -19,7 +19,9 @@ nodes:
 - name: frame
   class_name: cuvis_ai_wur_course.node.source.CourseFrame
   hparams:
-    name: null
+    keys:
+    - target
+    - fold
 - name: standardize
   class_name: cuvis_ai.node.pretreatments.standardize.Standardize
   hparams:
@@ -58,10 +60,6 @@ nodes:
     - 1
     refit_on_holdout: false
     eps: 1.0e-12
-- name: mean_pls
-  class_name: cuvis_ai_wur_course.node.fusion.SpatialMean
-  hparams:
-    name: null
 - name: metrics_pls
   class_name: cuvis_ai_wur_course.node.metrics.RegressionMetrics
   hparams: {}
@@ -79,10 +77,6 @@ nodes:
     x_std: 0.04972
     y_mean: 37.9531
     y_std: 13.7968
-- name: mean_mlp
-  class_name: cuvis_ai_wur_course.node.fusion.SpatialMean
-  hparams:
-    name: null
 - name: metrics_mlp
   class_name: cuvis_ai_wur_course.node.metrics.RegressionMetrics
   hparams: {}
@@ -100,10 +94,6 @@ nodes:
     x_std: 0.04972
     y_mean: 37.9531
     y_std: 13.7968
-- name: mean_resnet1d
-  class_name: cuvis_ai_wur_course.node.fusion.SpatialMean
-  hparams:
-    name: null
 - name: metrics_resnet1d
   class_name: cuvis_ai_wur_course.node.metrics.RegressionMetrics
   hparams: {}
@@ -135,14 +125,8 @@ connections:
 - source: pca.outputs.explained_variance_ratio
   target: explained_variance.inputs.explained_variance_ratio
 - source: pls.outputs.prediction
-  target: mean_pls.inputs.prediction
-- source: mean_pls.outputs.prediction
   target: metrics_pls.inputs.prediction
 - source: mlp.outputs.prediction
-  target: mean_mlp.inputs.prediction
-- source: mean_mlp.outputs.prediction
   target: metrics_mlp.inputs.prediction
 - source: resnet1d.outputs.prediction
-  target: mean_resnet1d.inputs.prediction
-- source: mean_resnet1d.outputs.prediction
   target: metrics_resnet1d.inputs.prediction

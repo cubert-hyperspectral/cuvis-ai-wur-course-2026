@@ -19,7 +19,9 @@ class RegressionMSELoss(LossNode):
     redeclared here. Plain ``torch.nn.functional.mse_loss`` under the ``reduction``
     hparam; no class-imbalance or per-target weighting, unlike
     ``cuvis_ai.node.losses.MSEReconstructionLoss`` which targets dense reconstructions
-    of arbitrary rank rather than a ``[B, T]`` regression head.
+    of arbitrary rank rather than a regression head. The prediction comes in as the
+    model's map ``[B, H, W, T]`` and is averaged over ``H`` and ``W`` per sample before
+    the comparison, as in ``RegressionMetrics``; on a mean spectrum the map is ``1 x 1``.
 
     Parameters
     ----------
@@ -34,8 +36,9 @@ class RegressionMSELoss(LossNode):
     INPUT_SPECS = {
         "prediction": PortSpec(
             dtype=torch.float32,
-            shape=(-1, -1),
-            description="Predicted regression values [B, T].",
+            shape=(-1, -1, -1, -1),
+            description="Predicted regression map [B, H, W, T], averaged over H and W per "
+            "sample before the comparison.",
         ),
         "target": PortSpec(
             dtype=torch.float32,
@@ -60,7 +63,7 @@ class RegressionMSELoss(LossNode):
         Parameters
         ----------
         prediction : Tensor
-            Predicted regression values [B, T].
+            Predicted regression map [B, H, W, T].
         target : Tensor
             Ground-truth regression values [B, T].
 
@@ -69,7 +72,7 @@ class RegressionMSELoss(LossNode):
         dict[str, Tensor]
             Dictionary with a single key ``"loss"``.
         """
-        loss = F.mse_loss(prediction, target, reduction=self.reduction)
+        loss = F.mse_loss(prediction.mean(dim=(1, 2)), target, reduction=self.reduction)
         return {"loss": loss}
 
 

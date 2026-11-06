@@ -1,11 +1,8 @@
 """Channel and prediction fusion nodes for the course regression pipelines.
 
 ``ChannelSlice`` splits a stacked feature block into its spatial and spectral
-parts (the 812-wide pork feature vector), ``PredictionMean`` averages several
-per-target predictions into one (the course's average-fusion row), and
-``SpatialMean`` collapses a per-pixel regression map into one value per frame
-and target, the step that turns a pixel-wise PLS map into the same ``[B, T]``
-shape the regression metrics and losses expect.
+parts (the 812-wide pork feature vector), and ``PredictionMean`` averages several
+prediction maps into one (the course's average-fusion row).
 """
 
 from __future__ import annotations
@@ -98,7 +95,7 @@ class ChannelSlice(Node):
 
 
 def _stack_predictions(values: Sequence[Tensor] | Tensor, node: str) -> Tensor:
-    """Stack the inbound tensors of a variadic prediction port into ``[N, B, T]``."""
+    """Stack the inbound tensors of a variadic prediction port along a new first axis."""
     items = list(values) if isinstance(values, (list, tuple)) else [values]
     if not items:
         raise ValueError(f"{node}: no predictions connected.")
@@ -112,60 +109,15 @@ def _stack_predictions(values: Sequence[Tensor] | Tensor, node: str) -> Tensor:
 
 
 class PredictionMean(Node):
-    """Average several ``[B, T]`` predictions into one, fan-in on one variadic port.
+    """Average several prediction maps into one, fan-in on one variadic port.
 
-    One per-target prediction per inbound connection (connection order is not
-    significant: the result is their plain mean), the course's average-fusion
-    row over the spatial, spectral and stacked PLS predictions.
-    ``cuvis_ai.node.fusion.ScoreMapFusion`` was checked first: it fuses
-    ``[B, H, W, C]`` score maps with several modes (mean, min, max, weighted,
-    geometric, soft-min), the right shape for anomaly and segmentation scores
-    but not for a ``[B, T]`` per-sample regression prediction; this node
-    follows the same variadic fan-in and stacking pattern at the
-    regression-prediction shape, with only the one fusion rule the course
-    uses.
-    """
-
-    _category = NodeCategory.TRANSFORM
-    _tags = frozenset({NodeTag.REGRESSION, NodeTag.DIFFERENTIABLE, NodeTag.TORCH})
-
-    INPUT_SPECS = {
-        "prediction": PortSpec(
-            dtype=torch.float32,
-            shape=(-1, -1),
-            variadic=True,
-            description="Per-target predictions [B, T] of one shape, one per inbound "
-            "connection (fan-in).",
-        ),
-    }
-
-    OUTPUT_SPECS = {
-        "prediction": PortSpec(
-            dtype=torch.float32,
-            shape=(-1, -1),
-            description="Mean prediction [B, T] across the inbound connections.",
-        ),
-    }
-
-    def forward(self, prediction: list[Tensor] | Tensor, **_: Any) -> dict[str, Tensor]:
-        """Return the elementwise mean of the inbound predictions."""
-        stack = _stack_predictions(prediction, "PredictionMean")  # [N, B, T]
-        return {"prediction": stack.mean(dim=0)}
-
-
-class SpatialMean(Node):
-    """Collapse a per-pixel regression map into one value per frame and target.
-
-    Input ``prediction [B, H, W, T]`` is a per-pixel regression map, such as
-    the pixel-wise PLS prediction on a 1x1-spectrum frame broadcast over an
-    image, or the per-pixel output of a model like ``PLSRegression`` run on a
-    full cube; output ``prediction [B, T]`` is the mean over ``H`` and ``W``,
-    which is the shape the regression metrics and losses take.
-
-    The node takes no mask on purpose: a batch's ``mask`` key is the ground-truth
-    mask the data module always emits (zeros for a frame without one), and the
-    pipeline fills an unconnected port of that name from the batch. A
-    mask-weighted mean over a map belongs to ``GroupWeightedMean``.
+    One per-target prediction map ``[B, H, W, T]`` per inbound connection
+    (connection order is not significant: the result is their plain elementwise
+    mean), the course's average-fusion row over the spatial, spectral and stacked
+    PLS predictions. The fused map goes on to ``RegressionMetrics``, which averages
+    it per sample. ``cuvis_ai.node.fusion.ScoreMapFusion`` (mode ``mean``) computes
+    the same mean, but its port is named ``scores``, which reads wrong for a fat
+    prediction in the course notebook, so this node keeps the regression name.
     """
 
     _category = NodeCategory.TRANSFORM
@@ -175,18 +127,22 @@ class SpatialMean(Node):
         "prediction": PortSpec(
             dtype=torch.float32,
             shape=(-1, -1, -1, -1),
-            description="Per-pixel regression map [B, H, W, T].",
+            variadic=True,
+            description="Per-target prediction maps [B, H, W, T] of one shape, one per "
+            "inbound connection (fan-in).",
         ),
     }
 
     OUTPUT_SPECS = {
         "prediction": PortSpec(
             dtype=torch.float32,
-            shape=(-1, -1),
-            description="Mean prediction [B, T] over H and W.",
+            shape=(-1, -1, -1, -1),
+            description="Elementwise mean prediction map [B, H, W, T] across the inbound "
+            "connections.",
         ),
     }
 
-    def forward(self, prediction: torch.Tensor, **_) -> dict[str, torch.Tensor]:
-        """Mean the per-pixel map over H and W."""
-        return {"prediction": prediction.mean(dim=(1, 2))}
+    def forward(self, prediction: list[Tensor] | Tensor, **_: Any) -> dict[str, Tensor]:
+        """Return the elementwise mean of the inbound prediction maps."""
+        stack = _stack_predictions(prediction, "PredictionMean")  # [N, B, H, W, T]
+        return {"prediction": stack.mean(dim=0)}
