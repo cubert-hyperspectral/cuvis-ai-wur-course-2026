@@ -64,15 +64,17 @@ COURSE_VALUES = {
         "PLS test R2": 0.799,
         "MLP test RMSE": 5.544,
         "MLP test R2": 0.823,
-        "1D ResNet test RMSE": 6.227,
+        "1D ResNet test RMSE": 6.222,
         "1D ResNet test R2": 0.776,
         "own MLP trainrun, best validation MSE": 29.04,
-        "own 1D ResNet trainrun, best validation MSE": 34.3,
+        "own 1D ResNet trainrun, best validation MSE": "34.30 / 78.58",
     },
 }
-# The one row allowed to read "open deviation": the course's training loop has a burn-in and
-# restores the best weights on every rate drop, ours has neither (notebook 03 explains it).
-ALLOWED_OPEN = {("03_spectral_vs_spatial", "own 1D ResNet trainrun, best validation MSE")}
+# Rows allowed to read "open deviation". The 1D ResNet trainrun row is reported, not judged:
+# the course's own two runs of the same recipe printed 34.30 and 78.58.
+ALLOWED_OPEN: set[tuple[str, str]] = set()
+# The course commit every notebook, the README and the vendored course code name.
+COURSE_COMMIT = "c65ba36"
 
 
 def _cells(stem: str) -> list[dict]:
@@ -150,7 +152,9 @@ def test_the_course_values_in_the_reproduction_table_never_move(stem: str) -> No
     rows = {}
     tree = ast.parse(_code_cells(stem)[-1])
     for node in ast.walk(tree):
-        if isinstance(node, ast.Assign) and any(getattr(t, "id", None) == "rows" for t in node.targets):
+        if isinstance(node, ast.Assign) and any(
+            getattr(t, "id", None) == "rows" for t in node.targets
+        ):
             for element in node.value.elts:
                 rows[ast.literal_eval(element.elts[0])] = ast.literal_eval(element.elts[1])
     assert rows == COURSE_VALUES[stem]
@@ -177,11 +181,36 @@ def test_the_notebook_builds_the_nodes_of_its_pipeline_yamls(stem: str) -> None:
 @pytest.mark.parametrize("stem", NOTEBOOKS)
 def test_the_baked_reproduction_table_has_no_unexpected_open_deviation(stem: str) -> None:
     outputs = _cells(stem)[-1].get("outputs", [])
-    html = "".join(
-        "".join(output.get("data", {}).get("text/html", "")) for output in outputs
+    html = "".join("".join(output.get("data", {}).get("text/html", "")) for output in outputs)
+    rows = re.findall(
+        r"<tr>\s*<th>\d+</th>\s*<td>(.*?)</td>.*?<td>([^<]*)</td>\s*</tr>", html, re.S
     )
-    rows = re.findall(r"<tr>\s*<th>\d+</th>\s*<td>(.*?)</td>.*?<td>([^<]*)</td>\s*</tr>", html, re.S)
     assert rows, f"{stem}: no baked reproduction table found"
     for name, status in rows:
         if status.strip() == "open deviation":
-            assert (stem, name.strip()) in ALLOWED_OPEN, f"{stem}: {name.strip()} is an open deviation"
+            assert (stem, name.strip()) in ALLOWED_OPEN, (
+                f"{stem}: {name.strip()} is an open deviation"
+            )
+
+
+@pytest.mark.parametrize("stem", NOTEBOOKS)
+def test_the_notebook_names_the_course_commit_it_reproduces(stem: str) -> None:
+    intro = "".join(_cells(stem)[0]["source"])
+    assert f"`{COURSE_COMMIT}`" in intro
+
+
+def test_the_readme_and_the_vendored_course_code_name_the_same_course_commit() -> None:
+    readme = (REPO / "README.md").read_text(encoding="utf-8")
+    vendored = (REPO / "cuvis_ai_wur_course" / "upstream" / "course_models.py").read_text(
+        encoding="utf-8"
+    )
+    assert f"`{COURSE_COMMIT}`" in readme
+    assert f"``{COURSE_COMMIT}``" in vendored
+
+
+def test_the_own_resnet_trainrun_row_is_reported_not_judged() -> None:
+    outputs = _cells("03_spectral_vs_spatial")[-1].get("outputs", [])
+    html = "".join("".join(output.get("data", {}).get("text/html", "")) for output in outputs)
+    row = re.search(r"own 1D ResNet trainrun, best validation MSE</td>(.*?)</tr>", html, re.S)
+    assert row, "the baked table has no own 1D ResNet trainrun row"
+    assert re.findall(r"<td>([^<]*)</td>", row.group(1))[-1].strip() == "reported"

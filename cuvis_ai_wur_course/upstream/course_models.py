@@ -1,6 +1,6 @@
 """Course model classes from ``end2end_spectral_vs_spatial_models.ipynb``.
 
-Source: notebook ``end2end_spectral_vs_spatial_models.ipynb``, commit ``0d2c33e`` of
+Source: notebook ``end2end_spectral_vs_spatial_models.ipynb``, commit ``c65ba36`` of
 ``LizaGenke/Chemometric-approaches-to-hyperspectral-processing``
 (https://github.com/LizaGenke/Chemometric-approaches-to-hyperspectral-processing).
 Licence pending the authors' written confirmation.
@@ -32,7 +32,7 @@ class InputStandardizer(nn.Module):
 
 
 class OutputDestandardizer(nn.Module):
-    """x * std + mean: the inverse of InputStandardizer, placed at the output of a regressor."""
+    """x * std + mean: maps the z-scored fat value the backbone predicts back to percent fat."""
 
     def __init__(self, mean: float = 0.0, std: float = 1.0):
         super().__init__()
