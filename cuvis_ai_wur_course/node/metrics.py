@@ -16,6 +16,11 @@ from torchmetrics import Metric as TorchMetric
 class RegressionMetrics(Node):
     """Pooled RMSE, R2 and MAE for a scalar or multi-target regression head.
 
+    The prediction comes in as the map a model emits, ``[B, H, W, T]``: its mean over
+    ``H`` and ``W`` is the one value per sample and target that is compared with the
+    target. On a mean spectrum the map is ``1 x 1``, so the mean is the prediction
+    itself and no shape adapter sits between the model and this node.
+
     Mirrors the pooling contract of ``cuvis_ai.node.metrics.AnomalyDetectionMetrics``:
     the three wrapped ``torchmetrics`` objects accumulate with ``update()`` over every
     batch of a validation or test pass and are read with a single ``compute()`` at the
@@ -42,8 +47,9 @@ class RegressionMetrics(Node):
     INPUT_SPECS = {
         "prediction": PortSpec(
             dtype=torch.float32,
-            shape=(-1, -1),
-            description="Predicted regression values [B, T].",
+            shape=(-1, -1, -1, -1),
+            description="Predicted regression map [B, H, W, T], averaged over H and W per "
+            "sample before the comparison (a 1x1 map for a mean spectrum).",
         ),
         "target": PortSpec(
             dtype=torch.float32,
@@ -109,7 +115,8 @@ class RegressionMetrics(Node):
         Parameters
         ----------
         prediction : Tensor
-            Predicted regression values [B, T].
+            Predicted regression map [B, H, W, T]; its mean over H and W is the
+            per-sample prediction compared with the target.
         target : Tensor
             Ground-truth regression values [B, T].
 
@@ -120,9 +127,10 @@ class RegressionMetrics(Node):
             tensor read straight off the corresponding metric's ``.compute()``.
         """
         self._seen_batch = True
-        self.rmse_metric.update(prediction, target)
-        self.r2_metric.update(prediction, target)
-        self.mae_metric.update(prediction, target)
+        per_sample = prediction.mean(dim=(1, 2))
+        self.rmse_metric.update(per_sample, target)
+        self.r2_metric.update(per_sample, target)
+        self.mae_metric.update(per_sample, target)
         return {
             "rmse": self.rmse_metric.compute(),
             "r2": self.r2_metric.compute(),

@@ -131,9 +131,9 @@ capabilities:
   input_specs:
     prediction:
       dtype: float32
-      shape: [-1, -1]
+      shape: [-1, -1, -1, -1]
       optional: false
-      description: Predicted regression values [B, T].
+      description: Predicted regression map [B, H, W, T], averaged over H and W per sample before the comparison (a 1x1 map for a mean spectrum).
     target:
       dtype: float32
       shape: [-1, -1]
@@ -163,9 +163,9 @@ capabilities:
   input_specs:
     prediction:
       dtype: float32
-      shape: [-1, -1]
+      shape: [-1, -1, -1, -1]
       optional: false
-      description: Predicted regression values [B, T].
+      description: Predicted regression map [B, H, W, T], averaged over H and W per sample before the comparison.
     target:
       dtype: float32
       shape: [-1, -1]
@@ -283,34 +283,17 @@ capabilities:
   input_specs:
     prediction:
       dtype: float32
-      shape: [-1, -1]
+      shape: [-1, -1, -1, -1]
       optional: false
-      description: Per-target predictions [B, T] of one shape, one per inbound connection (fan-in).
+      description: Per-target prediction maps [B, H, W, T] of one shape, one per inbound connection (fan-in).
       variadic: true
   output_specs:
     prediction:
       dtype: float32
-      shape: [-1, -1]
-      optional: false
-      description: Mean prediction [B, T] across the inbound connections.
-  doc_summary: Average several ``[B, T]`` predictions into one, fan-in on one variadic port.
-- class_name: cuvis_ai_wur_course.node.fusion.SpatialMean
-  category: transform
-  tags: [differentiable, regression, torch]
-  icon_svg: "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"#6FAE5C\" stroke-width=\"2.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\">\n  <path d=\"M52 26a20 20 0 0 0-36 0\"/>\n  <path d=\"M52 16v10h-10\"/>\n  <path d=\"M12 38a20 20 0 0 0 36 0\"/>\n  <path d=\"M12 48v-10h10\"/>\n</svg>\n"
-  input_specs:
-    prediction:
-      dtype: float32
       shape: [-1, -1, -1, -1]
       optional: false
-      description: Per-pixel regression map [B, H, W, T].
-  output_specs:
-    prediction:
-      dtype: float32
-      shape: [-1, -1]
-      optional: false
-      description: Mean prediction [B, T] over H and W.
-  doc_summary: Collapse a per-pixel regression map into one value per frame and target.
+      description: Elementwise mean prediction map [B, H, W, T] across the inbound connections.
+  doc_summary: Average several prediction maps into one, fan-in on one variadic port.
 - class_name: cuvis_ai_wur_course.node.kiwi.LabelBBoxFilter
   category: transform
   tags: [bbox, mask, segmentation, torch]
@@ -573,3 +556,25 @@ capabilities:
       optional: false
       description: Binary mask [B, Hc / downsample, Wc / downsample] int32 at the map's region, 1 for belly pixels.
   doc_summary: Bring a slice mask to the region and resolution of a predicted chemical map.
+- class_name: cuvis_ai_wur_course.node.render.BandSweep
+  category: visualizer
+  tags: [hyperspectral, image, video]
+  icon_svg: "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"#9A5DD4\" stroke-width=\"2.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\">\n  <rect x=\"8\" y=\"10\" width=\"48\" height=\"44\" rx=\"2\"/>\n  <path d=\"M14 44l10-12 8 6 12-16\"/>\n  <circle cx=\"14\" cy=\"44\" r=\"1.5\" fill=\"#9A5DD4\" stroke=\"none\"/>\n  <circle cx=\"24\" cy=\"32\" r=\"1.5\" fill=\"#9A5DD4\" stroke=\"none\"/>\n  <circle cx=\"32\" cy=\"38\" r=\"1.5\" fill=\"#9A5DD4\" stroke=\"none\"/>\n  <circle cx=\"44\" cy=\"22\" r=\"1.5\" fill=\"#9A5DD4\" stroke=\"none\"/>\n</svg>\n"
+  input_specs:
+    cube:
+      dtype: float32
+      shape: [-1, -1, -1, -1]
+      optional: false
+      description: Hyperspectral cube [B, H, W, C].
+    wavelengths:
+      dtype: int32
+      shape: [-1]
+      optional: false
+      description: Wavelength array [C] in nanometres, one entry per band.
+  output_specs:
+    rgb_image:
+      dtype: float32
+      shape: [-1, -1, -1, 3]
+      optional: false
+      description: One grayscale frame per rendered band [B * ceil(C / step), H, W, 3] in [0, 1], in band order, batch elements one after another.
+  doc_summary: Render one grayscale frame per band, so a video sink plays a cube as a sweep through its wavelengths.

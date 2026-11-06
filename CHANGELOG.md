@@ -3,6 +3,11 @@
 ## [Unreleased]
 
 ### Changed
+- `RegressionMetrics`, `RegressionMSELoss` and `PredictionMean` take the model's prediction map `[B, H, W, T]`; metrics and loss average it over H and W per sample, the fusion averages maps elementwise. `SpatialMean`, the shape adapter that stood between every model and its metrics, is removed; the numbers do not move (a mean spectrum gives a 1 x 1 map). `pork_pls_fusion` drops from 15 to 12 nodes, `spectral_models` from 13 to 10, `pls_mean_spectra_fit` from 7 to 6, `mlp_train` and `resnet1d_train` from 5 to 4.
+- `CourseFrame(keys=...)` declares only `cube` and the named batch keys on one instance, so a diagram shows the frame ports its pipeline uses; every course pipeline names its keys. Without `keys` the frame keeps all eight ports.
+- `kiwi_sam3_spectral_match` is split into three pipelines that match the notebook's three steps: `kiwi_segment` (pseudo-RGB, SAM3), `kiwi_filters` (the size and spectral-angle filters side by side on SAM3's mask) and `kiwi_crop_features` (one kiwi cropped, rendered and embedded). SAM3 runs once; the later stages read their inputs from the batch.
+- Dependency floors `cuvis-ai>=0.22.1` and `cuvis-ai-core>=0.20.1`.
+- The three notebooks are re-authored on these pipelines and re-baked: every pipeline cell draws its graph with the node names through `utils.show_pipeline` (the Standardize migration had dropped those calls, leaving whole module trees as cell output), notebook 01 teaches the kiwi lesson as the three stages with the hand-off built in the cell, and the prediction plots read the model outputs. All 37 reproduction rows keep their values; the 1D ResNet own trainrun, whose result moves from run to run, lands inside the 15 percent band in this bake (38.10 against the course's 34.30). `tests/test_notebooks.py` guards the notebook sources against the pipeline YAMLs and checks the baked tables.
 - `pork_pls_fusion` centres and scales with one `Standardize(axis="channel")` node instead of `MeanCenter` followed by `UnitVarianceScaling`; `pls_mean_spectra_fit` and `pls_pixel_map` use `Standardize(axis="spectrum", ddof=0)` in place of `SNVCorrection`; `spectral_models` uses `Standardize(axis="global", ddof=0, eps=1e-6, exclude_folds=[1])` in place of the plugin's own `GlobalScalarStandardizer`, now removed with its tests. The SNV replacement moves from the old node's unbiased per-pixel standard deviation to `ddof=0`'s population one; the PLS rows are unaffected since the regression coefficient absorbs the constant per-pixel rescale.
 
 ### Added
@@ -21,6 +26,7 @@
 - `prepare-course-data kiwi-demo --spectrum-csv` writes the kiwi reference spectrum for the spectral-match filter.
 - The three teaching notebooks under `notebooks/` (`01_pretrained_ai`, `02_unet_chemical_maps`, `03_spectral_vs_spatial`) with `utils.py` for plotting and the reproduction tables, baked on the synthetic stand-in.
 - `RegressionMetrics.compute()` returns the pooled RMSE, R2 and MAE as floats.
+- `BandSweep` renders one labelled grayscale frame per band, and the pipeline `kiwi_video` writes the kiwi cube as the course's pseudo-RGB, true colour and colour infrared stills and as a sweep through its 224 bands (four videos under `outputs/`; `tools/build_pipelines.py` builds the YAML).
 
 ### Changed
 - `CourseFrame` hands the wavelengths on as np.int32 `[C]`, like the builtin source node.

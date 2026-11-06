@@ -16,7 +16,8 @@ nodes:
 - name: frame
   class_name: cuvis_ai_wur_course.node.source.CourseFrame
   hparams:
-    name: null
+    keys:
+    - target
 - name: mlp
   class_name: cuvis_ai_wur_course.node.models.SpectrumRegressor
   hparams:
@@ -31,10 +32,6 @@ nodes:
     x_std: 0.04972
     y_mean: 37.9531
     y_std: 13.7968
-- name: mean
-  class_name: cuvis_ai_wur_course.node.fusion.SpatialMean
-  hparams:
-    name: null
 - name: loss
   class_name: cuvis_ai_wur_course.node.losses.RegressionMSELoss
   hparams:
@@ -50,8 +47,6 @@ connections:
 - source: frame.outputs.target
   target: metrics.inputs.target
 - source: mlp.outputs.prediction
-  target: mean.inputs.prediction
-- source: mean.outputs.prediction
   target: loss.inputs.prediction
-- source: mean.outputs.prediction
+- source: mlp.outputs.prediction
   target: metrics.inputs.prediction

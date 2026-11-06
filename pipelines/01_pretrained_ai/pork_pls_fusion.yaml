@@ -17,7 +17,10 @@ nodes:
 - name: frame
   class_name: cuvis_ai_wur_course.node.source.CourseFrame
   hparams:
-    name: null
+    keys:
+    - wavelengths
+    - target
+    - fold
 - name: standardize
   class_name: cuvis_ai.node.pretreatments.standardize.Standardize
   hparams:
@@ -73,24 +76,12 @@ nodes:
     holdout_folds: each
     refit_on_holdout: true
     eps: 1.0e-12
-- name: mean_spatial
-  class_name: cuvis_ai_wur_course.node.fusion.SpatialMean
-  hparams:
-    name: null
 - name: metrics_spatial
   class_name: cuvis_ai_wur_course.node.metrics.RegressionMetrics
   hparams: {}
-- name: mean_spectral
-  class_name: cuvis_ai_wur_course.node.fusion.SpatialMean
-  hparams:
-    name: null
 - name: metrics_spectral
   class_name: cuvis_ai_wur_course.node.metrics.RegressionMetrics
   hparams: {}
-- name: mean_stacked
-  class_name: cuvis_ai_wur_course.node.fusion.SpatialMean
-  hparams:
-    name: null
 - name: metrics_stacked
   class_name: cuvis_ai_wur_course.node.metrics.RegressionMetrics
   hparams: {}
@@ -139,20 +130,14 @@ connections:
 - source: spectral_block.outputs.cube
   target: pls_spectral.inputs.cube
 - source: pls_spatial.outputs.prediction
-  target: mean_spatial.inputs.prediction
-- source: pls_spectral.outputs.prediction
-  target: mean_spectral.inputs.prediction
-- source: pls_stacked.outputs.prediction
-  target: mean_stacked.inputs.prediction
-- source: mean_spatial.outputs.prediction
   target: metrics_spatial.inputs.prediction
-- source: mean_spatial.outputs.prediction
+- source: pls_spatial.outputs.prediction
   target: fusion.inputs.prediction
-- source: mean_spectral.outputs.prediction
+- source: pls_spectral.outputs.prediction
   target: metrics_spectral.inputs.prediction
-- source: mean_spectral.outputs.prediction
+- source: pls_spectral.outputs.prediction
   target: fusion.inputs.prediction
-- source: mean_stacked.outputs.prediction
+- source: pls_stacked.outputs.prediction
   target: metrics_stacked.inputs.prediction
 - source: fusion.outputs.prediction
   target: metrics_fusion.inputs.prediction

@@ -1,0 +1,59 @@
+metadata:
+  name: kiwi_segment
+  description: 'Kiwi cube to the course''s pseudo-RGB (575, 535, 445 nm) and SAM3
+    segment-everything: one label mask and the object ids, the input of kiwi_filters.'
+  created: ''
+  tags:
+  - course
+  - sam3
+  - segmentation
+  author: Cubert GmbH
+  cuvis_ai_version: 0.14.4
+plugins:
+- cuvis_ai_builtin
+- cuvis_ai_wur_course
+- sam3
+nodes:
+- name: frame
+  class_name: cuvis_ai_wur_course.node.source.CourseFrame
+  hparams:
+    keys:
+    - wavelengths
+- name: pseudo_rgb
+  class_name: cuvis_ai.node.channel_selector.FixedWavelengthSelector
+  hparams:
+    target_wavelengths:
+    - 575.0
+    - 535.0
+    - 445.0
+    normalize_output: true
+    norm_mode: running
+    apply_gamma: true
+    freeze_running_bounds_after_frames: 20
+    running_warmup_frames: 10
+- name: sam3
+  class_name: cuvis_ai_sam3.node.SAM3SegmentEverything
+  hparams:
+    checkpoint_path: null
+    device: null
+    compile_model: false
+    points_per_side: 32
+    points_per_batch: 64
+    pred_iou_thresh: 0.8
+    stability_score_thresh: 0.95
+    stability_score_offset: 1.0
+    mask_threshold: 0.0
+    box_nms_thresh: 0.7
+    crop_n_layers: 0
+    crop_nms_thresh: 0.7
+    crop_overlap_ratio: 0.3413333333333333
+    crop_n_points_downscale_factor: 1
+    min_mask_region_area: 0
+    multimask_output: true
+connections:
+- source: frame.outputs.cube
+  target: pseudo_rgb.inputs.cube
+- source: frame.outputs.wavelengths
+  target: pseudo_rgb.inputs.wavelengths
+- source: pseudo_rgb.outputs.rgb_image
+  target: sam3.inputs.rgb_image

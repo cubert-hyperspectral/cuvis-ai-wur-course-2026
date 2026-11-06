@@ -1,0 +1,42 @@
+metadata:
+  name: kiwi_crop_features
+  description: 'The first kiwi of the spectral filter''s mask cropped and padded to
+    256 x 256, rendered as pseudo-RGB and embedded with ImageNet ResNet-18. Batch:
+    cube and wavelengths from kiwi_segment, mask from kiwi_filters.'
+  created: ''
+  tags:
+  - course
+  - resnet18
+  - features
+  author: Cubert GmbH
+  cuvis_ai_version: 0.14.4
+plugins:
+- cuvis_ai_builtin
+- cuvis_ai_wur_course
+nodes:
+- name: kiwi_crop
+  class_name: cuvis_ai_wur_course.node.kiwi.LabelCropPad
+  hparams:
+    canvas_size: 256
+    label_selection: first
+- name: crop_rgb
+  class_name: cuvis_ai.node.channel_selector.FixedWavelengthSelector
+  hparams:
+    target_wavelengths:
+    - 575.0
+    - 535.0
+    - 445.0
+    normalize_output: true
+    norm_mode: running
+    apply_gamma: true
+    freeze_running_bounds_after_frames: 20
+    running_warmup_frames: 10
+- name: features
+  class_name: cuvis_ai_wur_course.node.features.ResNet18Features
+  hparams:
+    weights: imagenet
+connections:
+- source: kiwi_crop.outputs.crop
+  target: crop_rgb.inputs.cube
+- source: crop_rgb.outputs.rgb_image
+  target: features.inputs.image

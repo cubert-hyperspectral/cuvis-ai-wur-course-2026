@@ -18,7 +18,11 @@ nodes:
 - name: frame
   class_name: cuvis_ai_wur_course.node.source.CourseFrame
   hparams:
-    name: null
+    keys:
+    - mask
+    - group
+    - quant_scale
+    - quant_bias
 - name: dequantize
   class_name: cuvis_ai_wur_course.node.maps.Dequantize
   hparams:

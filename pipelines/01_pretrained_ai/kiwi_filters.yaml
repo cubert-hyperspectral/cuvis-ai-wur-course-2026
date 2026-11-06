@@ -1,0 +1,73 @@
+metadata:
+  name: kiwi_filters
+  description: 'The course''s two kiwi filters on SAM3''s mask, side by side: bounding-box
+    size, and spectral angle against the saved kiwi spectrum below 0.035 rad; each
+    counts what it keeps. Batch: cube, wavelengths, mask, object_ids from kiwi_segment.'
+  created: ''
+  tags:
+  - course
+  - spectral-match
+  - filter
+  author: Cubert GmbH
+  cuvis_ai_version: 0.14.4
+plugins:
+- cuvis_ai_builtin
+- cuvis_ai_wur_course
+nodes:
+- name: size_filter
+  class_name: cuvis_ai_wur_course.node.kiwi.LabelBBoxFilter
+  hparams:
+    min_height: 50
+    max_height: 120
+    min_width: 150
+    max_width: 210
+    max_labels: 1024
+- name: count_size_filter
+  class_name: cuvis_ai.node.metrics.DistinctLabelCount
+  hparams: {}
+- name: object_spectra
+  class_name: cuvis_ai.node.spectral_extractor.SpectralSignatureExtractor
+  hparams:
+    trim_fraction: 0.0
+    min_mask_pixels: 1
+    zero_norm_threshold: 1.0e-08
+- name: object_references
+  class_name: cuvis_ai.node.spectral_extractor.SignaturesToReferences
+  hparams:
+    normalize: null
+- name: kiwi_angle
+  class_name: cuvis_ai.node.spectral_angle_mapper.SpectralAngleMapper
+  hparams:
+    num_channels: null
+    eps: 1.0e-12
+- name: kiwi_reference
+  class_name: cuvis_ai.node.numpy_file.NpyReader
+  hparams:
+    file_path: data\course\kiwi\kiwi_reference.npy
+- name: kiwi_decision
+  class_name: cuvis_ai.node.deciders.binary_decider.ScoreThreshold
+  hparams:
+    threshold: 0.035
+    keep: below
+- name: spectral_filter
+  class_name: cuvis_ai_wur_course.node.kiwi.LabelKeep
+  hparams:
+    max_labels: 1024
+- name: count_spectral_filter
+  class_name: cuvis_ai.node.metrics.DistinctLabelCount
+  hparams: {}
+connections:
+- source: size_filter.outputs.mask
+  target: count_size_filter.inputs.mask
+- source: object_spectra.outputs.signatures
+  target: object_references.inputs.signatures
+- source: object_references.outputs.spectral_signature
+  target: kiwi_angle.inputs.cube
+- source: kiwi_angle.outputs.best_scores
+  target: kiwi_decision.inputs.scores
+- source: kiwi_reference.outputs.data
+  target: kiwi_angle.inputs.spectral_signature
+- source: kiwi_decision.outputs.decisions
+  target: spectral_filter.inputs.decisions
+- source: spectral_filter.outputs.mask
+  target: count_spectral_filter.inputs.mask
