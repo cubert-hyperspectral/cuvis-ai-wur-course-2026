@@ -71,7 +71,7 @@ COURSE_VALUES = {
     },
 }
 # Rows allowed to read "open deviation". The 1D ResNet trainrun row is reported, not judged:
-# the course's own two runs of the same recipe printed 34.30 and 78.58.
+# the course's two published runs printed 34.30 and 78.58.
 ALLOWED_OPEN: set[tuple[str, str]] = set()
 # The course commit every notebook, the README and the vendored course code name.
 COURSE_COMMIT = "c65ba36"
