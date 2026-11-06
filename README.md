@@ -3,7 +3,7 @@
 The 2026 notebooks of the WUR course "AI for spectral and hyperspectral data processing"
 (Liza Genke, Puneet Mishra; repository
 [LizaGenke/Chemometric-approaches-to-hyperspectral-processing](https://github.com/LizaGenke/Chemometric-approaches-to-hyperspectral-processing),
-folder `2026`, commit `0d2c33e`) rebuilt with [cuvis-ai](https://github.com/cubert-hyperspectral/cuvis-ai).
+folder `2026`, commit `c65ba36`) rebuilt with [cuvis-ai](https://github.com/cubert-hyperspectral/cuvis-ai).
 This repository is a fork of the course repository: the course material stays under `2025/` and
 `2026/` as published, with the course's own README as `README_course.md`, and the rebuild sits
 next to it. The processing steps live in tested nodes of this plugin and are wired as pipeline YAMLs with
