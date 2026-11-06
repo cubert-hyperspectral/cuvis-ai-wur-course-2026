@@ -178,6 +178,15 @@ def test_a_trimmed_frame_emits_only_its_declared_outputs() -> None:
     assert set(out) == {"cube", "target"}
 
 
+def test_a_trimmed_frame_called_directly_leaves_undeclared_keys_untouched() -> None:
+    """A key the instance does not declare is neither converted nor emitted, whatever its type."""
+    node = CourseFrame(keys=("target",))
+    batch = _mean_spectra_batch()
+    batch["wavelengths"] = np.array([450, 550, 650], dtype=np.int32)  # not a tensor
+    out = node(**batch)
+    assert set(out) == {"cube", "target"}
+
+
 def test_a_trimmed_frame_in_a_pipeline_ignores_the_batch_keys_it_does_not_declare() -> None:
     pipeline = CuvisPipeline("course_frame_trim_test")
     frame = CourseFrame(name="frame", keys=("mask",))

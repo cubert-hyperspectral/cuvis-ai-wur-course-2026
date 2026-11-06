@@ -171,24 +171,27 @@ class CourseFrame(Node):
     ) -> dict[str, Any]:
         """Normalize a course batch into pipeline ports, passing optional keys through.
 
-        Only the ports this instance declares are emitted, so a frame trimmed with
-        ``keys`` hands on nothing else even when the batch carries more keys.
+        Only the ports this instance declares are converted and emitted, so a frame
+        trimmed with ``keys`` hands on nothing else even when the batch carries more
+        keys, and a key it does not declare is never touched (a direct call may pass
+        one in any form).
         """
+        wanted = self.OUTPUT_SPECS
         result: dict[str, Any] = {"cube": cube.to(torch.float32)}
-        if wavelengths is not None:
+        if wavelengths is not None and "wavelengths" in wanted:
             # The builtin source emits np.int32 [C]; the course grid (747.92 nm steps) rounds to
             # whole nanometres, which every wavelength consumer here only uses for lookup.
             result["wavelengths"] = wavelengths[0].round().to(torch.int32).cpu().numpy()
-        if mask is not None:
+        if mask is not None and "mask" in wanted:
             result["mask"] = mask.to(torch.int32)
-        if target is not None:
+        if target is not None and "target" in wanted:
             result["target"] = target.to(torch.float32)
-        if fold is not None:
+        if fold is not None and "fold" in wanted:
             result["fold"] = fold.to(torch.int32)
-        if group is not None:
+        if group is not None and "group" in wanted:
             result["group"] = group.to(torch.int32)
-        if quant_scale is not None:
+        if quant_scale is not None and "quant_scale" in wanted:
             result["quant_scale"] = quant_scale.to(torch.float32)
-        if quant_bias is not None:
+        if quant_bias is not None and "quant_bias" in wanted:
             result["quant_bias"] = quant_bias.to(torch.float32)
-        return {key: value for key, value in result.items() if key in self.OUTPUT_SPECS}
+        return result

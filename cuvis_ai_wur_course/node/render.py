@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from typing import Any
 
 import numpy as np
@@ -17,7 +18,8 @@ class BandSweep(Node):
     its wavelengths.
 
     Each band is stretched with its own percentiles (``low`` and ``high``, the 0.5 and 99.5
-    percent of the cuvis-ai false-colour selectors) to [0, 1], repeated into three channels and,
+    percent of the cuvis-ai false-colour selectors; one sort per batch element gives the
+    quantiles of every band at once) to [0, 1], repeated into three channels and,
     with ``label``, stamped with its wavelength in the bottom-left corner (the top-left is where
     ``ToVideoNode`` prints its frame counter). Every ``step``-th band is
     rendered in band order, batch elements one after another, so ``rgb_image`` carries
@@ -39,7 +41,7 @@ class BandSweep(Node):
     label_scale : int, optional
         Bitmap font scale of the label (default 3, a 21 px tall line).
     eps : float, optional
-        Floor of the percentile range before dividing (default 1e-6).
+        Floor of the percentile range before dividing (default 1e-6); finite and positive.
     """
 
     _category = NodeCategory.VISUALIZER
@@ -80,6 +82,8 @@ class BandSweep(Node):
             raise ValueError("step must be at least 1")
         if not 0.0 <= float(low) < float(high) <= 1.0:
             raise ValueError("percentile fractions must satisfy 0 <= low < high <= 1")
+        if not math.isfinite(float(eps)) or float(eps) <= 0.0:
+            raise ValueError("eps must be a finite positive number")
         self.step = int(step)
         self.low = float(low)
         self.high = float(high)
@@ -106,11 +110,11 @@ class BandSweep(Node):
         )
         index = 0
         for b in range(int(batch)):
+            # the quantiles of every band at once, [2, C], from one sort of the [H * W, C] view
+            q = torch.quantile(cube[b].reshape(-1, channels), self._quantiles, dim=0)
+            gray = ((cube[b] - q[0]) / (q[1] - q[0]).clamp_min(self.eps)).clamp(0.0, 1.0)
             for k in bands:
-                band = cube[b, :, :, k]
-                q = torch.quantile(band.reshape(-1), self._quantiles)
-                gray = ((band - q[0]) / (q[1] - q[0]).clamp_min(self.eps)).clamp(0.0, 1.0)
-                frame = gray.unsqueeze(-1).expand(height, width, 3)
+                frame = gray[:, :, k].unsqueeze(-1).expand(height, width, 3)
                 if self.label:
                     frame = self._stamp(frame, int(wavelengths[k]))
                 frames[index].copy_(frame)

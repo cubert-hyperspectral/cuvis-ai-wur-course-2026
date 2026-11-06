@@ -124,6 +124,12 @@ def test_rejects_a_step_below_one():
         BandSweep(step=0)
 
 
+@pytest.mark.parametrize("eps", [0.0, -1e-6, float("nan"), float("inf")])
+def test_rejects_an_eps_that_is_not_finite_and_positive(eps: float):
+    with pytest.raises(ValueError):
+        BandSweep(eps=eps)
+
+
 def test_reload_smoke(tmp_path):
     source = _CubeSource(name="source")
     sweep = BandSweep(name="sweep", step=2, label=False)

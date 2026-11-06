@@ -44,7 +44,7 @@ training run with the study's losses, and the stacking fusion of notebook 01.
 ```
 cuvis_ai_wur_course/      the plugin: node/ (one module per family), data/ (the data module),
                           prepare_data.py (the CLI), upstream/ (vendored course and study code)
-plugins/                  the manifest cuvis_ai_wur_course.yaml (23 nodes and the data module)
+plugins/                  the manifest cuvis_ai_wur_course.yaml (21 nodes and the data module)
 pipelines/                one folder per notebook: pipeline YAMLs with rendered PNGs
 trainruns/                three statistical fits and two gradient runs
 notebooks/                the three notebooks and utils.py (plotting and tables only)
@@ -124,6 +124,7 @@ course's, and the plugin's YOLO26 labels are reported next to them.
 | `node/pca.py` | `DatasetPCA` |
 | `node/pretreatment.py` | `SpectralBinning`, `SavitzkyGolayInterp` |
 | `node/fusion.py` | `ChannelSlice`, `PredictionMean` |
+| `node/render.py` | `BandSweep` (one grayscale frame per band, for a video sweep through the cube) |
 | `node/kiwi.py`, `node/features.py` | `LabelBBoxFilter`, `LabelCropPad`, `LabelKeep`, `ResNet18Features` |
 | `node/models.py` | `SpectrumRegressor` (the course's MLP and 1D ResNet) |
 | `node/unet.py`, `node/maps.py` | `UNetChemicalMapEnsemble`, `Dequantize`, `CenterCrop`, `MaskToMapResolution`, `GroupWeightedMean`, `ChemicalMapStatistics` |
