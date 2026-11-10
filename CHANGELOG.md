@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- The README and notebooks 02 and 03 credit Ole-Christian Galbo Engstrøm, whose scripts the two end-to-end course notebooks compile (Liza Genke, 10 Nov); the README states the course authors' agreement of November 2026.
 - The fork follows the course repository up to commit `c65ba36` (feedback from Ole on the two end-to-end notebooks, `2026/requirements.txt`); the notebooks, the README and the vendored course models name that commit.
 - Notebook 03: the 1D ResNet test RMSE row reads the course's new print 6.222 with a tolerance of 0.005; the own 1D ResNet trainrun row is reported, not judged, next to the course's two published runs (34.30 with a shuffled loader, 78.58 without; one full batch per epoch either way); the text says that no network had its hyperparameters tuned, so the rows do not rank the models.
 - Notebook 02 says why the pixel-wise PLS map is not judged by its mean (SNV per pixel against SNV of the mean spectrum).
