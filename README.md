@@ -22,10 +22,12 @@ training run with the study's losses, and the stacking fusion of notebook 01.
 ## Sources and licences
 
 - Course notebooks and data: Liza Genke and Puneet Mishra, Wageningen University and Research. The
-  course data (mean spectra, example belly slices, the kiwi cube and reference spectrum, the course's
-  trained weights) is not part of this repository; `prepare-course-data` reads it from a local copy
-  of the course folder. The course model code in `cuvis_ai_wur_course/upstream/course_models.py`
-  and the use of the course weights follow the terms agreed with the course authors (pending).
+  two end-to-end notebooks (`end2end_unet_chemical_maps.ipynb`, `end2end_spectral_vs_spatial_models.ipynb`)
+  compile scripts by Ole-Christian Galbo Engstrøm. The course data (mean spectra, example belly slices,
+  the kiwi cube and reference spectrum, the course's trained weights) is not part of this repository;
+  `prepare-course-data` reads it from a local copy of the course folder. The course model code in
+  `cuvis_ai_wur_course/upstream/course_models.py` and the use of the course weights follow the terms
+  agreed with the course authors (November 2026).
 - Study: O.-C. G. Engstrom, M. Albano-Gaglio, E. S. Dreier, Y. Bouzembrak, M. Font-i-Furnols,
   P. Mishra, K. S. Pedersen (2025). Transforming Hyperspectral Images Into Chemical Maps: An
   End-to-End Deep Learning Approach. Journal of Chemometrics 39:e70041,
